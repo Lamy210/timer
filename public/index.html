@@ -46,8 +46,11 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #warn{color:var(--red);font-size:13px}
 .startbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
 .starthelp{margin:10px 0 0}
+label.check{flex-direction:row;align-items:center;gap:8px;font-size:12px;color:var(--sub);margin-top:10px}
+input[type=checkbox]{width:auto;padding:0;accent-color:var(--ac)}
 #run header{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
 #run header b{font-variant-numeric:tabular-nums;color:var(--ac)}
+#meetLeft.over{color:var(--red)}
 #run header .sp{margin-left:auto}
 .mainbox{text-align:center;padding:26px 10px 22px}
 .label{font-size:12px;color:var(--sub);letter-spacing:.35em;margin-bottom:6px}
@@ -56,6 +59,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .clock.small{font-size:40px;color:var(--sub)}
 .clock.fin{color:var(--ok)}
 .clock.warn{color:var(--warn)}
+.clock.over{color:var(--red)}
 .clock.endjp{font-size:110px;letter-spacing:.25em;color:var(--ok)}
 .endsAt{font-size:15px;color:var(--sub);margin:6px 0 14px;min-height:1.4em;overflow-wrap:anywhere}
 .endsAt b{color:var(--tx);font-variant-numeric:tabular-nums}
@@ -101,7 +105,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 <main>
 <section id="setup">
   <h1>MTGタイマー<small>日本時間（JST）基準</small></h1>
-  <p class="lead">すべての時刻は日本時間で入力・表示します。予定終了時刻と各議題の終了時刻は固定です。「MTG開始時刻で開始」は予定時刻まで待機し、開始が遅れた場合は終了済みの議題をスキップして次の議題へ進みます。「今すぐ開始」は現在の日本時刻を開始時刻にして、終了時刻も現在から計算し直します。開始前と各議題の終了前に、設定したタイミングでアラームと日本語音声を鳴らします。</p>
+  <p class="lead">すべての時刻は日本時間で入力・表示します。「今すぐ開始（再計算）」は現在の日本時刻から終了時刻も計算し直します。「今すぐ開始（終了維持）」は予定終了時刻を維持したまま今すぐ開始します。「開始時刻まで待機」は予定時刻まで待ち、開始が遅れた場合は終了済みの議題をスキップします。終了時刻を過ぎた場合は、設定により超過時間を表示しながら継続できます。</p>
   <div class="card">
     <div class="fields">
       <label>MTG開始時刻（日本時間）<input type="time" id="planStart" step="1" value="10:00:00"></label>
@@ -110,7 +114,9 @@ button:disabled{opacity:.4;cursor:not-allowed}
       <label>終了前アラーム（秒前）<input type="number" id="preEndSec" min="0" max="300" step="10" value="30"></label>
       <div class="hint">予定終了：<b id="planEndDisp">--:--:--</b></div>
     </div>
+    <label class="check"><input type="checkbox" id="overrunMode" checked> 終了時刻を過ぎても継続する（超過表示）</label>
     <div class="hint" id="planDateDisp">開始予定：--</div>
+    <div class="hint" id="nowEndDisp">今すぐ開始（再計算）：終了 --</div>
     <div class="hint alarmPreview" id="alarmPreview"></div>
     <div class="jstline">現在の日本時間（JST）　<b id="jstSetupClock">--:--:--</b></div>
   </div>
@@ -125,20 +131,21 @@ button:disabled{opacity:.4;cursor:not-allowed}
     <button type="button" class="mini" id="addItem" style="margin-top:10px">＋議題を追加</button>
     <div class="totals">割り振り合計 <b id="sumDisp">0:00</b>　／　残り <b id="restDisp">0:00</b>　<span id="warn"></span></div>
     <div class="startbar">
-      <button type="button" class="acc big" id="startNowBtn">今すぐ開始（日本時間）</button>
-      <button type="button" class="big" id="startPlanBtn">MTG開始時刻で開始</button>
+      <button type="button" class="acc big" id="startNowBtn">今すぐ開始（再計算）</button>
+      <button type="button" class="big" id="startFixedBtn">今すぐ開始（終了維持）</button>
+      <button type="button" class="big" id="startPlanBtn">開始時刻まで待機</button>
       <button type="button" id="voiceTestBtn">音声テスト</button>
       <button type="button" id="notifyBtn">通知を有効化</button>
     </div>
-    <p class="hint starthelp">開始前アラームは「MTG開始時刻で開始」で開始時刻が未来の場合に鳴ります。終了前アラームは各議題の終了前に鳴ります。0にするとオフになります。</p>
+    <p class="hint starthelp">「今すぐ開始（再計算）」は現在時刻基準で終了時刻を再計算します。「今すぐ開始（終了維持）」は予定終了時刻を固定して今すぐ開始します（予定が2時間以上先・終了済みの場合は使えません）。「開始時刻まで待機」は予定時刻まで待機し、開始前アラームも鳴ります。超過表示がオンの場合、終了時刻後も「会議を終了」を押すまで継続します。</p>
   </div>
 </section>
 
 <section id="run" hidden>
   <header>
     <span>日本時間 <b id="jstRunClock">--:--:--</b></span>
-    <span>会議終了 <b id="meetEnd">--:--:--</b></span>
-    <span>会議の残り <b id="meetLeft">--:--</b></span>
+    <span><span id="meetEndLabel">会議終了</span> <b id="meetEnd">--:--:--</b></span>
+    <span><span id="meetLeftLabel">会議の残り</span> <b id="meetLeft">--:--</b></span>
     <span class="sp"></span>
     <button type="button" id="soundBtn" class="big" aria-pressed="true">音声あり</button>
     <button type="button" id="fsBtn" class="big">全画面</button>
@@ -153,6 +160,8 @@ button:disabled{opacity:.4;cursor:not-allowed}
     <div class="ctrl">
       <button type="button" id="skipBtn" class="big acc">次の議題へ（この議題を終了）</button>
       <button type="button" id="backBtn" class="big">前の議題へ戻る</button>
+      <button type="button" id="extendBtn" class="big" title="現在の議題と以降の予定、会議終了を5分延長します">+5分延長</button>
+      <button type="button" id="finishBtn" class="big acc" hidden>会議を終了</button>
     </div>
     <div class="next">つぎ：<b id="nextName">—</b>　終了 <b id="nextEnd">--:--:--</b></div>
   </div>
@@ -238,6 +247,15 @@ function resolvePlanStartMs(todSec, totalSec, nowMs) {
   let ms = todToMs(todSec, nowMs);
   if (nowMs >= ms + totalSec * 1000) ms += DAY_MS;
   return ms;
+}
+
+function getFixedStartInfo(ps, totalSec, nowMs) {
+  if (ps == null || totalSec <= 0) return null;
+  const planStartMs = todToMs(ps, nowMs);
+  const meetEndMs = planStartMs + totalSec * 1000;
+  if (nowMs >= meetEndMs) return null;
+  if (planStartMs > nowMs && planStartMs - nowMs > 2 * 60 * 60 * 1000) return null;
+  return { planStartMs: planStartMs, meetEndMs: meetEndMs };
 }
 
 function fmtTodFrom(baseTod, offsetSec) {
@@ -521,16 +539,31 @@ function updateCalc(skipSave) {
   const ps = parseTime($("planStart").value);
   const totalMin = clampNum($("totalMin").value, 0, 480);
   const total = totalMin * 60;
+  const now = Date.now();
+  const planStartMs = ps == null
+    ? null
+    : total > 0 ? resolvePlanStartMs(ps, total, now) : todToMs(ps, now);
   let cum = 0;
   rows.forEach((r, i) => {
     cum += rowDur(r);
-    if (rowRefs[i]) rowRefs[i].end.textContent = ps == null ? "—" : fmtTodFrom(ps, cum);
+    if (rowRefs[i]) {
+      rowRefs[i].end.textContent = planStartMs == null ? "—" : fmtClockRel(planStartMs + cum * 1000, now);
+    }
   });
   $("sumDisp").textContent = fmtDur(cum * 1000);
   $("restDisp").textContent = fmtDur(Math.max(0, total - cum) * 1000);
-  $("planEndDisp").textContent = ps == null ? "--:--:--" : fmtTodFrom(ps, total);
+  $("planEndDisp").textContent = planStartMs == null ? "--:--:--" : fmtClockRel(planStartMs + total * 1000, now);
 
   refreshPlanDate();
+
+  $("nowEndDisp").textContent = total > 0
+    ? "今すぐ開始（再計算）：終了 " + fmtClockRel(now + total * 1000, now)
+    : "今すぐ開始（再計算）：終了 --";
+  const fixed = getFixedStartInfo(ps, total, now);
+  $("startFixedBtn").disabled = !fixed;
+  $("startFixedBtn").title = fixed
+    ? "予定終了時刻を維持して今すぐ開始します"
+    : "予定が2時間以上先か、会議が終了済みです。「今すぐ開始（再計算）」または「開始時刻まで待機」を使ってください。";
 
   let msg = "";
   if (ps == null) msg = "MTG開始時刻を入力してください。";
@@ -541,9 +574,7 @@ function updateCalc(skipSave) {
   const preStart = clampNum($("preStartMin").value, 0, 60);
   const preEnd = clampNum($("preEndSec").value, 0, 300);
   const parts = [];
-  if (ps != null && preStart > 0) {
-    const now = Date.now();
-    const planStartMs = total > 0 ? resolvePlanStartMs(ps, total, now) : todToMs(ps, now);
+  if (planStartMs != null && preStart > 0) {
     const preMs = planStartMs - preStart * 60000;
     parts.push("開始前アラーム " + fmtClockRel(preMs, now) + (preMs <= now ? "（時間切れ）" : ""));
   } else {
@@ -570,6 +601,7 @@ function saveSetup() {
       totalMin: $("totalMin").value,
       preStartMin: $("preStartMin").value,
       preEndSec: $("preEndSec").value,
+      overrunMode: $("overrunMode").checked,
       rows: rows.map((r) => ({ name: r.name, min: r.min, sec: r.sec }))
     }));
   } catch (e) {}
@@ -589,6 +621,7 @@ function loadSetup() {
     $("totalMin").value = clampNum(saved.totalMin, 1, 480);
     $("preStartMin").value = clampNum(saved.preStartMin, 0, 60);
     $("preEndSec").value = clampNum(saved.preEndSec, 0, 300);
+    if (typeof saved.overrunMode === "boolean") $("overrunMode").checked = saved.overrunMode;
     if (Array.isArray(saved.rows) && saved.rows.length) {
       rows.length = 0;
       saved.rows.slice(0, 100).forEach((r) => {
@@ -617,14 +650,22 @@ function restoreRun() {
     const raw = sessionStorage.getItem(STORAGE_RUN);
     if (!raw) return false;
     const saved = JSON.parse(raw);
+    const now = Date.now();
+    const overrunMode = saved && saved.overrunMode !== false;
+    const tooLate = overrunMode
+      ? (!saved || now >= saved.meetEndMs + 2 * 60 * 60 * 1000)
+      : (!saved || now >= saved.meetEndMs);
     if (!saved || saved.ended || !Array.isArray(saved.items) || !saved.items.length
       || !Number.isFinite(saved.planStartMs) || !Number.isFinite(saved.actStartMs)
-      || !Number.isFinite(saved.meetEndMs) || Date.now() >= saved.meetEndMs) {
+      || !Number.isFinite(saved.meetEndMs) || tooLate) {
       sessionStorage.removeItem(STORAGE_RUN);
       return false;
     }
     R = saved;
     R.ended = false;
+    R.overrunMode = overrunMode;
+    R.overrun = !!R.overrun && now >= R.meetEndMs;
+    R.overrunAnnounced = !!R.overrunAnnounced;
     R.preEndSec = clampNum(R.preEndSec, 0, 300);
     R.startPreEnabled = !!R.startPreEnabled;
     R.meetPreEnabled = !!R.meetPreEnabled;
@@ -710,6 +751,7 @@ function startRun(mode) {
   const totalSec = Math.round(totalMin * 60);
   const preStartMin = clampNum($("preStartMin").value, 0, 60);
   const preEndSec = clampNum($("preEndSec").value, 0, 300);
+  const overrunMode = $("overrunMode").checked;
   $("totalMin").value = totalMin;
   $("preStartMin").value = preStartMin;
   $("preEndSec").value = preEndSec;
@@ -724,7 +766,19 @@ function startRun(mode) {
       toast("MTG開始時刻（日本時間）を入力してください。");
       return;
     }
-    planStartMs = resolvePlanStartMs(ps, totalSec, now);
+    if (mode === "fixed") {
+      const info = getFixedStartInfo(ps, totalSec, now);
+      if (!info) {
+        toast("予定が2時間以上先か、会議が終了済みです。「今すぐ開始（再計算）」または「開始時刻まで待機」を使ってください。");
+        return;
+      }
+      planStartMs = info.planStartMs;
+      if (planStartMs - now > 60 * 60 * 1000) {
+        if (!window.confirm("予定より " + fmtDur(planStartMs - now) + " 早く開始します。終了時刻は予定どおりです。よろしいですか？")) return;
+      }
+    } else {
+      planStartMs = resolvePlanStartMs(ps, totalSec, now);
+    }
   }
 
   const built = buildItems(planStartMs);
@@ -739,7 +793,7 @@ function startRun(mode) {
 
   if (mode === "now") $("planStart").value = fmtHMS(planStartMs);
 
-  const actStartMs = Math.max(planStartMs, now);
+  const actStartMs = mode === "fixed" ? now : Math.max(planStartMs, now);
   const meetEndMs = planStartMs + totalSec * 1000;
   const lastEndMs = built.items[built.items.length - 1].endMs;
   let skipped = 0;
@@ -762,6 +816,9 @@ function startRun(mode) {
     meetEndMs: meetEndMs,
     preStartMin: preStartMin,
     preEndSec: preEndSec,
+    overrunMode: overrunMode,
+    overrun: false,
+    overrunAnnounced: false,
     items: built.items,
     idx: -1,
     ended: false,
@@ -790,7 +847,13 @@ function startRun(mode) {
 
   const dayDiff = dayIndexJst(planStartMs) - dayIndexJst(now);
   const lateMs = actStartMs - planStartMs;
-  if (lateMs > 5000) {
+  if (mode === "fixed") {
+    if (lateMs > 5000) {
+      toast("予定より " + fmtDur(lateMs) + " 遅れて開始します。" + (skipped > 0 ? skipped + "件の議題をスキップしました。" : ""));
+    } else if (planStartMs - now > 5000) {
+      toast("予定より " + fmtDur(planStartMs - now) + " 早く開始します。終了時刻は予定どおりです。");
+    }
+  } else if (lateMs > 5000) {
     toast("予定より " + fmtDur(lateMs) + " 遅れて開始します。" + (skipped > 0 ? skipped + "件の議題をスキップしました。" : ""));
   } else if (dayDiff > 0) {
     toast("開始予定は " + fmtPlanStartLabel(planStartMs, now) + " です。");
@@ -810,8 +873,8 @@ function showBanner(title, sub, voiceText, kind, holdMs) {
   bannerTimer = setTimeout(hideBanner, holdMs || 8000);
 }
 
-function showEndBanner() {
-  showBanner("終 了", "会議の終了時刻です（日本時間 " + fmtClockRel(R.meetEndMs, R.planStartMs) + "）", "終了", "endj", 30000);
+function showEndBanner(manual, endMs) {
+  showBanner("終 了", (manual ? "会議を終了しました" : "会議の終了時刻です") + "（日本時間 " + fmtClockRel(endMs, R.planStartMs) + "）", "終了", "endj", 30000);
 }
 
 function hideBanner() {
@@ -904,17 +967,31 @@ function fireMeetingPreAlarm(now) {
   persistRun();
 }
 
-function endMeeting() {
+function enterOverrun() {
+  if (R.overrun) return;
+  R.overrun = true;
+  R.overrunAnnounced = true;
+  beepEnd();
+  showBanner("終了時刻を超過", "会議を終了するには「会議を終了」を押してください", "予定の終了時刻を過ぎました。会議を継続中です。終了する場合は会議を終了を押してください。", "endj", 15000);
+  speakJa("予定の終了時刻を過ぎました。会議を継続中です。終了する場合は会議を終了を押してください。");
+  notify("終了時刻を超過", "会議を終了するには「会議を終了」を押してください。");
+  persistRun();
+}
+
+function endMeeting(manual) {
+  const endMs = manual ? Date.now() : R.meetEndMs;
   R.ended = true;
+  R.overrun = false;
+  R.actualEndMs = endMs;
   R.items.forEach((it) => {
     if (it.status === "wait" || it.status === "run") it.status = "done";
   });
   R.idx = -1;
   beepEnd();
-  showEndBanner();
-  speakJa("終了");
-  toast("会議の終了時刻です（日本時間 " + fmtClockRel(R.meetEndMs, R.planStartMs) + "）");
-  notify("会議終了", "会議の終了時刻です（日本時間 " + fmtClockRel(R.meetEndMs, R.planStartMs) + "）");
+  showEndBanner(manual, endMs);
+  speakJa(manual ? "会議を終了しました" : "終了");
+  toast((manual ? "会議を終了しました" : "会議の終了時刻です") + "（日本時間 " + fmtClockRel(endMs, R.planStartMs) + "）");
+  notify("会議終了", (manual ? "会議を終了しました" : "会議の終了時刻です") + "（日本時間 " + fmtClockRel(endMs, R.planStartMs) + "）");
   releaseWakeLock();
   try {
     sessionStorage.removeItem(STORAGE_RUN);
@@ -928,10 +1005,19 @@ function tick() {
   }
   if (!R) return;
   const now = Date.now();
+  if (R.overrun && now < R.meetEndMs) {
+    R.overrun = false;
+    persistRun();
+  }
 
-  if (!R.ended) {
+  if (!R.ended && !R.overrun) {
     if (now >= R.meetEndMs) {
-      endMeeting();
+      if (R.overrunMode) {
+        autoComplete(now);
+        enterOverrun();
+      } else {
+        endMeeting(false);
+      }
     } else if (now >= R.actStartMs) {
       const chain = autoComplete(now);
       if (chain > 0) persistRun();
@@ -962,8 +1048,16 @@ const ST = {
 function renderRun(now) {
   updateSoundButton();
   $("jstRunClock").textContent = fmtHMS(now);
-  $("meetEnd").textContent = fmtClockRel(R.meetEndMs, R.planStartMs);
-  $("meetLeft").textContent = fmtDur(R.meetEndMs - now);
+  $("meetEndLabel").textContent = R.ended ? "終了時刻" : "会議終了";
+  $("meetEnd").textContent = fmtClockRel(R.ended && R.actualEndMs ? R.actualEndMs : R.meetEndMs, R.planStartMs);
+  const overrun = !!R.overrun;
+  $("meetLeftLabel").textContent = overrun ? "超過" : "会議の残り";
+  $("meetLeft").textContent = overrun ? fmtDur(now - R.meetEndMs) : fmtDur(Math.max(0, R.meetEndMs - now));
+  $("meetLeft").classList.toggle("over", overrun);
+  $("finishBtn").hidden = R.ended || !(overrun || R.idx < 0);
+  $("skipBtn").hidden = overrun || R.ended || R.idx < 0;
+  $("backBtn").hidden = overrun || R.ended;
+  $("extendBtn").hidden = R.ended;
   const waiting = now < R.actStartMs;
 
   if (R.ended) {
@@ -972,8 +1066,19 @@ function renderRun(now) {
     $("curLeft").textContent = "終了";
     $("curLeft").className = "clock endjp";
     $("curEndLabel").textContent = "会議終了";
-    $("curEnd").textContent = fmtClockRel(R.meetEndMs, R.planStartMs);
+    $("curEnd").textContent = fmtClockRel(R.actualEndMs || R.meetEndMs, R.planStartMs);
     $("curPrev").textContent = "";
+    $("curBar").style.width = "100%";
+    $("nextName").textContent = "—";
+    $("nextEnd").textContent = "--:--:--";
+  } else if (overrun) {
+    $("curLabel").textContent = "会議";
+    $("curName").textContent = "超過中";
+    $("curLeft").textContent = "+" + fmtDur(now - R.meetEndMs);
+    $("curLeft").className = "clock over";
+    $("curEndLabel").textContent = "予定終了";
+    $("curEnd").textContent = fmtClockRel(R.meetEndMs, R.planStartMs);
+    $("curPrev").textContent = "「会議を終了」を押すまで継続します";
     $("curBar").style.width = "100%";
     $("nextName").textContent = "—";
     $("nextEnd").textContent = "--:--:--";
@@ -1029,7 +1134,7 @@ function renderRun(now) {
     $("nextEnd").textContent = "--:--:--";
   }
 
-  const key = (R.ended ? "E" : waiting ? "W" : "R") + "|" + R.idx + "|"
+  const key = (R.ended ? "E" : overrun ? "O" : waiting ? "W" : "R") + "|" + R.idx + "|" + R.meetEndMs + "|"
     + R.items.map((it) => it.name + ":" + it.status + ":" + it.endMs + ":" + it.note).join("|");
   if (key !== lastRenderKey) {
     lastRenderKey = key;
@@ -1099,11 +1204,13 @@ function renderRun(now) {
 
   document.title = R.ended
     ? "終了｜MTGタイマー"
-    : waiting
-      ? "開始待ち " + $("curLeft").textContent + "｜MTGタイマー"
-      : R.idx >= 0
-        ? $("curLeft").textContent + " " + R.items[R.idx].name + "｜MTGタイマー"
-        : "残り " + $("curLeft").textContent + "｜MTGタイマー";
+    : overrun
+      ? "超過 +" + fmtDur(now - R.meetEndMs) + "｜MTGタイマー"
+      : waiting
+        ? "開始待ち " + $("curLeft").textContent + "｜MTGタイマー"
+        : R.idx >= 0
+          ? $("curLeft").textContent + " " + R.items[R.idx].name + "｜MTGタイマー"
+          : "残り " + $("curLeft").textContent + "｜MTGタイマー";
 }
 
 function refreshPlanDate() {
@@ -1141,6 +1248,7 @@ bindNumberField("totalMin", 1, 480);
 bindNumberField("preStartMin", 0, 60);
 bindNumberField("preEndSec", 0, 300);
 $("planStart").addEventListener("input", () => updateCalc());
+$("overrunMode").addEventListener("change", scheduleSaveSetup);
 
 $("voiceTestBtn").addEventListener("click", () => {
   unlockAudio();
@@ -1184,10 +1292,54 @@ document.addEventListener("fullscreenchange", () => {
 });
 
 $("startNowBtn").addEventListener("click", () => startRun("now"));
+$("startFixedBtn").addEventListener("click", () => startRun("fixed"));
 $("startPlanBtn").addEventListener("click", () => startRun("plan"));
 
+$("finishBtn").addEventListener("click", () => {
+  if (!R || R.ended) return;
+  endMeeting(true);
+  renderRun(Date.now());
+});
+
+$("extendBtn").addEventListener("click", () => {
+  if (!R || R.ended) return;
+  const now = Date.now();
+  if (now < actionLockUntil) return;
+  actionLockUntil = now + 500;
+  const delta = 5 * 60000;
+
+  if (R.overrun) {
+    R.meetEndMs = Math.max(R.meetEndMs, now) + delta;
+    R.overrun = false;
+    R.overrunAnnounced = false;
+    R.meetPreEnabled = R.preEndSec > 0;
+    R.meetPreMs = R.meetEndMs - R.preEndSec * 1000;
+    R.meetPreFired = !R.meetPreEnabled || R.meetPreMs <= now;
+  } else {
+    R.meetEndMs += delta;
+    if (R.idx >= 0) {
+      const cur = R.items[R.idx];
+      cur.endMs += delta;
+      cur.preFired = false;
+      for (let i = R.idx + 1; i < R.items.length; i++) {
+        if (R.items[i].status === "wait") R.items[i].endMs += delta;
+      }
+    }
+    const lastEndMs = R.items.length ? R.items[R.items.length - 1].endMs : R.meetEndMs;
+    R.meetPreEnabled = R.preEndSec > 0 && R.meetEndMs - lastEndMs > R.preEndSec * 1000;
+    R.meetPreMs = R.meetEndMs - R.preEndSec * 1000;
+    R.meetPreFired = !R.meetPreEnabled || R.meetPreMs <= now;
+  }
+
+  showBanner("5分延長しました", "会議終了 " + fmtClockRel(R.meetEndMs, R.planStartMs), "5分延長しました。会議終了は" + fmtClockRel(R.meetEndMs, R.planStartMs) + "です。", "start", 7000);
+  speakJa("5分延長しました。");
+  toast("5分延長しました（会議終了 " + fmtClockRel(R.meetEndMs, R.planStartMs) + "）");
+  persistRun();
+  renderRun(now);
+});
+
 $("skipBtn").addEventListener("click", () => {
-  if (!R || R.idx < 0 || R.ended) return;
+  if (!R || R.idx < 0 || R.ended || R.overrun) return;
   const now = Date.now();
   if (now < actionLockUntil) return;
   actionLockUntil = now + 500;
@@ -1211,7 +1363,7 @@ $("skipBtn").addEventListener("click", () => {
 });
 
 $("backBtn").addEventListener("click", () => {
-  if (!R || R.ended) return;
+  if (!R || R.ended || R.overrun) return;
   const now = Date.now();
   if (now < actionLockUntil) return;
   actionLockUntil = now + 500;
