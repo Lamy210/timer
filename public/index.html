@@ -57,12 +57,12 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .clock.fin{color:var(--ok)}
 .clock.warn{color:var(--warn)}
 .clock.endjp{font-size:110px;letter-spacing:.25em;color:var(--ok)}
-.endsAt{font-size:15px;color:var(--sub);margin:6px 0 14px;min-height:1.4em}
+.endsAt{font-size:15px;color:var(--sub);margin:6px 0 14px;min-height:1.4em;overflow-wrap:anywhere}
 .endsAt b{color:var(--tx);font-variant-numeric:tabular-nums}
 .bar{height:14px;background:#0b0d12;border:1px solid var(--line);border-radius:7px;overflow:hidden;max-width:640px;margin:0 auto}
 #curBar{height:100%;background:linear-gradient(90deg,var(--ac2),var(--ac));width:0%}
 .ctrl{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}
-.next{margin-top:14px;font-size:14px;color:var(--sub)}
+.next{margin-top:14px;font-size:14px;color:var(--sub);overflow-wrap:anywhere}
 .next b{color:var(--tx)}
 .timeline{display:flex;height:46px;border-radius:8px;overflow:hidden;margin:6px 0 16px;border:1px solid var(--line)}
 .seg{position:relative;overflow:hidden;border-right:1px solid #0f1115;min-width:3px}
@@ -76,7 +76,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .seg.fut{background:#2b323f}
 .st{font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap}
 .st.done{color:#6b7280}.st.run{color:var(--ac);font-weight:700}.st.wait{color:var(--sub)}.st.skipc{color:#5b6472}
-#banner{position:fixed;top:18px;left:50%;transform:translateX(-50%);width:min(92vw,780px);z-index:50;text-align:center;background:#263041;border:2px solid var(--warn);border-radius:12px;padding:16px 20px 12px;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+#banner{position:fixed;top:18px;left:50%;transform:translateX(-50%);width:min(92vw,780px);z-index:50;text-align:center;background:#263041;border:2px solid var(--warn);border-radius:12px;padding:16px 20px 12px;box-shadow:0 8px 30px rgba(0,0,0,.5);pointer-events:none}
 #banner[hidden]{display:none}
 #banner.pre{border-color:var(--warn)}
 #banner.start{border-color:var(--ac)}
@@ -84,10 +84,16 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .bTitle{font-size:34px;font-weight:700;color:var(--warn);letter-spacing:.08em}
 #banner.start .bTitle{color:var(--ac)}
 #banner.endj .bTitle{color:var(--red)}
-.bSub{font-size:16px;margin-top:6px;color:var(--tx)}
+.bSub{font-size:16px;margin-top:6px;color:var(--tx);overflow-wrap:anywhere}
 .bVoice{font-size:13px;margin-top:8px;color:var(--sub);font-style:italic}
 #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#263041;border:1px solid var(--ac);color:#fff;padding:10px 18px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s;max-width:90vw;z-index:60}
 #toast.on{opacity:1}
+:fullscreen main{max-width:1400px;padding-top:36px}
+:fullscreen .clock{font-size:clamp(56px,14vw,150px)}
+:fullscreen .clock.small{font-size:clamp(32px,7vw,64px)}
+:fullscreen .clock.endjp{font-size:clamp(64px,18vw,190px)}
+:fullscreen #curName{font-size:clamp(22px,4vw,48px)}
+:fullscreen .mainbox{padding:56px 20px}
 @media(max-width:640px){.clock{font-size:56px}.clock.endjp{font-size:64px}#curName{font-size:22px}input[type=time]{width:160px}.bTitle{font-size:24px}.startbar button{flex:1 1 100%}.tablehint{display:block}}
 </style>
 </head>
@@ -104,6 +110,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
       <label>終了前アラーム（秒前）<input type="number" id="preEndSec" min="0" max="300" step="10" value="30"></label>
       <div class="hint">予定終了：<b id="planEndDisp">--:--:--</b></div>
     </div>
+    <div class="hint" id="planDateDisp">開始予定：--</div>
     <div class="hint alarmPreview" id="alarmPreview"></div>
     <div class="jstline">現在の日本時間（JST）　<b id="jstSetupClock">--:--:--</b></div>
   </div>
@@ -121,6 +128,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
       <button type="button" class="acc big" id="startNowBtn">今すぐ開始（日本時間）</button>
       <button type="button" class="big" id="startPlanBtn">MTG開始時刻で開始</button>
       <button type="button" id="voiceTestBtn">音声テスト</button>
+      <button type="button" id="notifyBtn">通知を有効化</button>
     </div>
     <p class="hint starthelp">開始前アラームは「MTG開始時刻で開始」で開始時刻が未来の場合に鳴ります。終了前アラームは各議題の終了前に鳴ります。0にするとオフになります。</p>
   </div>
@@ -132,14 +140,15 @@ button:disabled{opacity:.4;cursor:not-allowed}
     <span>会議終了 <b id="meetEnd">--:--:--</b></span>
     <span>会議の残り <b id="meetLeft">--:--</b></span>
     <span class="sp"></span>
-    <button type="button" id="soundBtn" class="big">音声あり</button>
+    <button type="button" id="soundBtn" class="big" aria-pressed="true">音声あり</button>
+    <button type="button" id="fsBtn" class="big">全画面</button>
     <button type="button" id="quitBtn" class="big">設定に戻る</button>
   </header>
   <div class="card mainbox">
     <div class="label" id="curLabel">いまの議題</div>
     <h2 id="curName">—</h2>
     <div class="clock" id="curLeft">--:--</div>
-    <div class="endsAt">この議題の終了 <b id="curEnd">--:--:--</b>　<i id="curPrev"></i></div>
+    <div class="endsAt"><span id="curEndLabel">この議題の終了</span> <b id="curEnd">--:--:--</b>　<i id="curPrev"></i></div>
     <div class="bar"><div id="curBar"></div></div>
     <div class="ctrl">
       <button type="button" id="skipBtn" class="big acc">次の議題へ（この議題を終了）</button>
@@ -154,12 +163,12 @@ button:disabled{opacity:.4;cursor:not-allowed}
   </table>
 </section>
 </main>
-<div id="banner" hidden>
+<div id="banner" role="alert" aria-live="assertive" aria-atomic="true" hidden>
   <div class="bTitle" id="bTitle"></div>
   <div class="bSub" id="bSub"></div>
   <div class="bVoice" id="bVoice"></div>
 </div>
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <script>
 (function () {
 "use strict";
@@ -167,6 +176,9 @@ button:disabled{opacity:.4;cursor:not-allowed}
 const $ = (id) => document.getElementById(id);
 const JST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
+const STORAGE_SETUP = "mtgTimer.setup.v1";
+const STORAGE_RUN = "mtgTimer.run.v1";
+const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 
 function pad(n) { return String(n).padStart(2, "0"); }
 function mod(n, m) { return ((n % m) + m) % m; }
@@ -208,6 +220,24 @@ function fmtClockRel(ms, refMs) {
   const diff = dayIndexJst(ms) - dayIndexJst(refMs);
   const prefix = diff === 1 ? "翌 " : diff > 1 ? "+" + diff + "日 " : "";
   return prefix + fmtClock(ms);
+}
+
+function fmtDateJst(ms) {
+  const p = jstParts(ms);
+  const wd = new Date(Date.UTC(p.y, p.mo, p.d)).getUTCDay();
+  return (p.mo + 1) + "/" + p.d + "（" + WEEKDAYS[wd] + "）";
+}
+
+function fmtPlanStartLabel(ms, refMs) {
+  const diff = dayIndexJst(ms) - dayIndexJst(refMs);
+  const rel = diff === 0 ? "本日" : diff === 1 ? "翌日" : diff > 1 ? diff + "日後" : "";
+  return rel + " " + fmtDateJst(ms) + " " + fmtClock(ms);
+}
+
+function resolvePlanStartMs(todSec, totalSec, nowMs) {
+  let ms = todToMs(todSec, nowMs);
+  if (nowMs >= ms + totalSec * 1000) ms += DAY_MS;
+  return ms;
 }
 
 function fmtTodFrom(baseTod, offsetSec) {
@@ -265,13 +295,60 @@ function toast(msg) {
 
 let AC = null;
 let soundOn = true;
+let audioUnlocked = false;
+
+function updateSoundButton() {
+  const btn = $("soundBtn");
+  if (!btn) return;
+  if (!audioUnlocked) {
+    btn.textContent = "音声を有効化";
+    btn.setAttribute("aria-pressed", soundOn ? "true" : "false");
+    return;
+  }
+  btn.textContent = soundOn ? "音声あり" : "音声なし";
+  btn.setAttribute("aria-pressed", soundOn ? "true" : "false");
+}
 
 function unlockAudio() {
   try {
     if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
-    if (AC && AC.state === "suspended") AC.resume();
+    if (AC) {
+      const resume = AC.state === "suspended" ? AC.resume() : Promise.resolve();
+      Promise.resolve(resume).then(() => {
+        audioUnlocked = true;
+        updateSoundButton();
+      }).catch(() => {});
+    }
   } catch (e) {
     AC = null;
+  }
+}
+
+function notify(title, body) {
+  try {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    if (document.visibilityState === "visible") return;
+    new Notification(title, { body: body, tag: "mtg-timer", renotify: true });
+  } catch (e) {}
+}
+
+function updateNotifyButton() {
+  const btn = $("notifyBtn");
+  if (!btn) return;
+  if (!("Notification" in window)) {
+    btn.disabled = true;
+    btn.textContent = "通知非対応";
+    return;
+  }
+  if (Notification.permission === "granted") {
+    btn.disabled = true;
+    btn.textContent = "通知有効";
+  } else if (Notification.permission === "denied") {
+    btn.disabled = true;
+    btn.textContent = "通知ブロック中";
+  } else {
+    btn.disabled = false;
+    btn.textContent = "通知を有効化";
   }
 }
 
@@ -378,8 +455,12 @@ function numInput(obj, key, min, max) {
   inp.value = obj[key];
   inp.style.width = "72px";
   inp.addEventListener("input", () => {
-    const v = Number(inp.value) || 0;
-    obj[key] = Math.max(min, Math.min(max, v));
+    const v = Number(inp.value);
+    obj[key] = Number.isFinite(v) ? Math.max(min, Math.min(max, v)) : min;
+    updateCalc();
+  });
+  inp.addEventListener("change", () => {
+    inp.value = obj[key];
     updateCalc();
   });
   return inp;
@@ -397,7 +478,11 @@ function renderRows() {
     inp.type = "text";
     inp.value = r.name;
     inp.placeholder = "議題" + (i + 1);
-    inp.addEventListener("input", () => { rows[i].name = inp.value; });
+    inp.setAttribute("aria-label", "議題" + (i + 1) + "の名前");
+    inp.addEventListener("input", () => {
+      rows[i].name = inp.value;
+      scheduleSaveSetup();
+    });
     tdN.appendChild(inp);
 
     const tdM = document.createElement("td");
@@ -432,9 +517,10 @@ function renderRows() {
   updateCalc();
 }
 
-function updateCalc() {
+function updateCalc(skipSave) {
   const ps = parseTime($("planStart").value);
-  const total = Math.max(0, Number($("totalMin").value) || 0) * 60;
+  const totalMin = clampNum($("totalMin").value, 0, 480);
+  const total = totalMin * 60;
   let cum = 0;
   rows.forEach((r, i) => {
     cum += rowDur(r);
@@ -443,6 +529,8 @@ function updateCalc() {
   $("sumDisp").textContent = fmtDur(cum * 1000);
   $("restDisp").textContent = fmtDur(Math.max(0, total - cum) * 1000);
   $("planEndDisp").textContent = ps == null ? "--:--:--" : fmtTodFrom(ps, total);
+
+  refreshPlanDate();
 
   let msg = "";
   if (ps == null) msg = "MTG開始時刻を入力してください。";
@@ -453,16 +541,112 @@ function updateCalc() {
   const preStart = clampNum($("preStartMin").value, 0, 60);
   const preEnd = clampNum($("preEndSec").value, 0, 300);
   const parts = [];
-  if (ps != null && preStart > 0) parts.push("開始前アラーム " + fmtTodFrom(ps, -preStart * 60));
-  else parts.push("開始前アラーム オフ");
+  if (ps != null && preStart > 0) {
+    const now = Date.now();
+    const planStartMs = total > 0 ? resolvePlanStartMs(ps, total, now) : todToMs(ps, now);
+    const preMs = planStartMs - preStart * 60000;
+    parts.push("開始前アラーム " + fmtClockRel(preMs, now) + (preMs <= now ? "（時間切れ）" : ""));
+  } else {
+    parts.push("開始前アラーム オフ");
+  }
   if (preEnd > 0) parts.push("各議題の終了 " + preEnd + " 秒前に終了前アラーム");
   else parts.push("終了前アラーム オフ");
   $("alarmPreview").textContent = parts.join("　／　");
+  if (!skipSave) scheduleSaveSetup();
 }
 
 let R = null;
 let tickTimer = null;
 let bannerTimer = null;
+let lastRenderKey = "";
+let runRowRefs = [];
+let actionLockUntil = 0;
+let saveSetupTimer = null;
+
+function saveSetup() {
+  try {
+    localStorage.setItem(STORAGE_SETUP, JSON.stringify({
+      planStart: $("planStart").value,
+      totalMin: $("totalMin").value,
+      preStartMin: $("preStartMin").value,
+      preEndSec: $("preEndSec").value,
+      rows: rows.map((r) => ({ name: r.name, min: r.min, sec: r.sec }))
+    }));
+  } catch (e) {}
+}
+
+function scheduleSaveSetup() {
+  if (saveSetupTimer) clearTimeout(saveSetupTimer);
+  saveSetupTimer = setTimeout(saveSetup, 250);
+}
+
+function loadSetup() {
+  try {
+    const raw = localStorage.getItem(STORAGE_SETUP);
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    if (saved.planStart && parseTime(saved.planStart) != null) $("planStart").value = saved.planStart;
+    $("totalMin").value = clampNum(saved.totalMin, 1, 480);
+    $("preStartMin").value = clampNum(saved.preStartMin, 0, 60);
+    $("preEndSec").value = clampNum(saved.preEndSec, 0, 300);
+    if (Array.isArray(saved.rows) && saved.rows.length) {
+      rows.length = 0;
+      saved.rows.slice(0, 100).forEach((r) => {
+        rows.push({
+          name: String(r.name || ""),
+          min: clampNum(r.min, 0, 600),
+          sec: clampNum(r.sec, 0, 59)
+        });
+      });
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+function persistRun() {
+  try {
+    if (R && !R.ended) sessionStorage.setItem(STORAGE_RUN, JSON.stringify(R));
+    else sessionStorage.removeItem(STORAGE_RUN);
+  } catch (e) {}
+}
+
+function restoreRun() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_RUN);
+    if (!raw) return false;
+    const saved = JSON.parse(raw);
+    if (!saved || saved.ended || !Array.isArray(saved.items) || !saved.items.length
+      || !Number.isFinite(saved.planStartMs) || !Number.isFinite(saved.actStartMs)
+      || !Number.isFinite(saved.meetEndMs) || Date.now() >= saved.meetEndMs) {
+      sessionStorage.removeItem(STORAGE_RUN);
+      return false;
+    }
+    R = saved;
+    R.ended = false;
+    R.preEndSec = clampNum(R.preEndSec, 0, 300);
+    R.startPreEnabled = !!R.startPreEnabled;
+    R.meetPreEnabled = !!R.meetPreEnabled;
+    R.startPreFired = !!R.startPreFired;
+    R.meetPreFired = !!R.meetPreFired;
+    R.items.forEach((it) => {
+      if (typeof it.note !== "string") it.note = "";
+      if (typeof it.preFired !== "boolean") it.preFired = false;
+    });
+    actionLockUntil = 0;
+    lastRenderKey = "";
+    $("setup").hidden = true;
+    $("run").hidden = false;
+    document.title = "MTGタイマー｜実行中";
+    requestWakeLock();
+    tick();
+    toast("前回のタイマーを復元しました。音声は「音声を有効化」を押してください。");
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 function buildItems(planStartMs) {
   const items = [];
@@ -478,11 +662,14 @@ function buildItems(planStartMs) {
       status: "wait",
       anchorMs: null,
       preFired: false,
-      endFired: false,
       note: ""
     });
   });
   return { items, cum };
+}
+
+function suppressShortPreAlarm(it) {
+  if (R.preEndSec > 0 && it.durMs <= R.preEndSec * 1000) it.preFired = true;
 }
 
 function advanceToNext(anchorMs) {
@@ -493,10 +680,10 @@ function advanceToNext(anchorMs) {
     const it = R.items[i];
     it.status = "run";
     it.anchorMs = Number.isFinite(anchorMs) ? anchorMs : Date.now();
+    suppressShortPreAlarm(it);
     return it;
   }
   R.idx = -1;
-  R.doneAll = true;
   return null;
 }
 
@@ -506,7 +693,6 @@ function autoComplete(now) {
     const it = R.items[R.idx];
     if (it.endMs > now) break;
     it.status = "done";
-    it.endFired = true;
     chain++;
     advanceToNext(Math.max(it.endMs, R.actStartMs));
   }
@@ -515,14 +701,18 @@ function autoComplete(now) {
 
 function startRun(mode) {
   unlockAudio();
-  const totalMin = Number($("totalMin").value);
-  if (!Number.isFinite(totalMin) || totalMin < 1) {
+  const rawTotal = Number($("totalMin").value);
+  if (!Number.isFinite(rawTotal) || rawTotal < 1) {
     toast("会議の長さを1分以上で入力してください。");
     return;
   }
+  const totalMin = Math.min(480, rawTotal);
   const totalSec = Math.round(totalMin * 60);
   const preStartMin = clampNum($("preStartMin").value, 0, 60);
   const preEndSec = clampNum($("preEndSec").value, 0, 300);
+  $("totalMin").value = totalMin;
+  $("preStartMin").value = preStartMin;
+  $("preEndSec").value = preEndSec;
   const now = Date.now();
   let planStartMs;
 
@@ -534,8 +724,7 @@ function startRun(mode) {
       toast("MTG開始時刻（日本時間）を入力してください。");
       return;
     }
-    planStartMs = todToMs(ps, now);
-    if (now >= planStartMs + totalSec * 1000) planStartMs += DAY_MS;
+    planStartMs = resolvePlanStartMs(ps, totalSec, now);
   }
 
   const built = buildItems(planStartMs);
@@ -568,17 +757,14 @@ function startRun(mode) {
   const meetPreMs = meetEndMs - preEndSec * 1000;
 
   R = {
-    mode: mode,
     planStartMs: planStartMs,
     actStartMs: actStartMs,
     meetEndMs: meetEndMs,
-    totalSec: totalSec,
     preStartMin: preStartMin,
     preEndSec: preEndSec,
     items: built.items,
     idx: -1,
     ended: false,
-    doneAll: false,
     startAnnounced: false,
     startPreEnabled: startPreEnabled,
     startPreMs: startPreMs,
@@ -588,6 +774,8 @@ function startRun(mode) {
     meetPreFired: !meetPreEnabled || meetPreMs <= actStartMs
   };
   advanceToNext(actStartMs);
+  actionLockUntil = 0;
+  lastRenderKey = "";
 
   if (tickTimer) {
     clearTimeout(tickTimer);
@@ -597,10 +785,15 @@ function startRun(mode) {
   $("run").hidden = false;
   document.title = "MTGタイマー｜実行中";
   requestWakeLock();
+  saveSetup();
+  persistRun();
 
+  const dayDiff = dayIndexJst(planStartMs) - dayIndexJst(now);
   const lateMs = actStartMs - planStartMs;
   if (lateMs > 5000) {
     toast("予定より " + fmtDur(lateMs) + " 遅れて開始します。" + (skipped > 0 ? skipped + "件の議題をスキップしました。" : ""));
+  } else if (dayDiff > 0) {
+    toast("開始予定は " + fmtPlanStartLabel(planStartMs, now) + " です。");
   }
   tick();
 }
@@ -631,28 +824,37 @@ function announceStart() {
   beepItem();
   if (R.idx >= 0) {
     const it = R.items[R.idx];
-    const msg = "最初の議題は「" + it.name + "」です。終了時刻は" + fmtClock(it.endMs) + "です。";
-    showBanner("MTG開始", "最初の議題：「" + it.name + "」　終了 " + fmtClockRel(it.endMs, R.planStartMs), msg, "start", 8000);
+    const endLabel = fmtClockRel(it.endMs, Date.now());
+    const msg = "最初の議題は「" + it.name + "」です。終了時刻は" + endLabel + "です。";
+    showBanner("MTG開始", "最初の議題：「" + it.name + "」　終了 " + endLabel, msg, "start", 8000);
     speakJa("MTGを開始します。" + msg);
+    notify("MTG開始", "最初の議題「" + it.name + "」 終了 " + endLabel);
   } else if (R.meetEndMs > Date.now()) {
     showBanner("MTG開始", "議題はすべて終了しています", "MTGを開始します。議題はすべて終了しています。", "start", 8000);
     speakJa("MTGを開始します。議題はすべて終了しています。");
+    notify("MTG開始", "議題はすべて終了しています。会議終了 " + fmtClockRel(R.meetEndMs, Date.now()));
   } else {
     showBanner("MTG終了", "会議の終了時刻を過ぎています", "会議の終了時刻を過ぎています。", "endj", 8000);
     speakJa("会議の終了時刻を過ぎています。");
+    notify("MTG終了", "会議の終了時刻を過ぎています。");
   }
+  persistRun();
 }
 
 function showNextAfterChain(now) {
   beepItem();
   if (R.idx >= 0) {
     const it = R.items[R.idx];
-    showBanner("次の内容に移ってください", "「" + it.name + "」　終了 " + fmtClockRel(it.endMs, R.planStartMs), "次の内容に移ってください。" + it.name, "pre", 7000);
+    const endLabel = fmtClockRel(it.endMs, Date.now());
+    showBanner("次の内容に移ってください", "「" + it.name + "」　終了 " + endLabel, "次の内容に移ってください。" + it.name, "pre", 7000);
     speakJa("次の内容に移ってください。" + it.name);
+    notify("次の議題", "「" + it.name + "」 終了 " + endLabel);
   } else if (R.meetEndMs > now) {
     showBanner("議題はすべて終了", "会議の終了 " + fmtClockRel(R.meetEndMs, R.planStartMs) + " まで自由時間です", "議題はすべて終わりました。会議はまもなく終了します。", "pre", 7000);
     speakJa("議題はすべて終わりました。会議はまもなく終了します。");
+    notify("議題はすべて終了", "会議終了 " + fmtClockRel(R.meetEndMs, Date.now()));
   }
+  persistRun();
 }
 
 function fireStartPreAlarm(now) {
@@ -662,8 +864,13 @@ function fireStartPreAlarm(now) {
   beepPreStart();
   const p = jstParts(R.actStartMs);
   const remain = R.actStartMs - now;
-  showBanner("まもなくMTG開始", "開始 " + fmtClock(R.actStartMs) + "（あと " + fmtDur(remain) + "）", "まもなくMTGが始まります。開始時刻は" + p.h + "時" + p.mi + "分です。", "pre", 7000);
-  speakJa("まもなくMTGが始まります。開始時刻は" + p.h + "時" + p.mi + "分です。");
+  const startLabel = fmtClockRel(R.actStartMs, now);
+  const dayDiff = dayIndexJst(R.actStartMs) - dayIndexJst(now);
+  const dayWord = dayDiff === 1 ? "明日" : dayDiff > 1 ? dayDiff + "日後" : "本日";
+  showBanner("まもなくMTG開始", "開始 " + startLabel + "（あと " + fmtDur(remain) + "）", "まもなくMTGが始まります。開始時刻は" + dayWord + p.h + "時" + p.mi + "分です。", "pre", 7000);
+  speakJa("まもなくMTGが始まります。開始時刻は" + dayWord + p.h + "時" + p.mi + "分です。");
+  notify("まもなくMTG開始", "開始 " + startLabel + "（あと " + fmtDur(remain) + "）");
+  persistRun();
 }
 
 function fireCurrentPreAlarm(now) {
@@ -676,8 +883,11 @@ function fireCurrentPreAlarm(now) {
   beepPre();
   const remain = it.endMs - now;
   const remainText = remainSpeech(remain);
-  showBanner("まもなく終了", "「" + it.name + "」　終了 " + fmtClockRel(it.endMs, R.planStartMs) + "（残り " + fmtDur(remain) + "）", "まもなく「" + it.name + "」が終了します。残り" + remainText + "です。", "pre", 7000);
+  const endLabel = fmtClockRel(it.endMs, Date.now());
+  showBanner("まもなく終了", "「" + it.name + "」　終了 " + endLabel + "（残り " + fmtDur(remain) + "）", "まもなく「" + it.name + "」が終了します。残り" + remainText + "です。", "pre", 7000);
   speakJa("まもなく「" + it.name + "」が終了します。残り" + remainText + "です。");
+  notify("まもなく終了", "「" + it.name + "」 終了 " + endLabel + "（残り " + fmtDur(remain) + "）");
+  persistRun();
 }
 
 function fireMeetingPreAlarm(now) {
@@ -687,22 +897,28 @@ function fireMeetingPreAlarm(now) {
   beepPre();
   const remain = R.meetEndMs - now;
   const remainText = remainSpeech(remain);
-  showBanner("まもなく会議終了", "会議終了 " + fmtClock(R.meetEndMs) + "（残り " + fmtDur(remain) + "）", "まもなく会議の終了時刻です。残り" + remainText + "です。", "pre", 7000);
+  const endLabel = fmtClockRel(R.meetEndMs, now);
+  showBanner("まもなく会議終了", "会議終了 " + endLabel + "（残り " + fmtDur(remain) + "）", "まもなく会議の終了時刻です。残り" + remainText + "です。", "pre", 7000);
   speakJa("まもなく会議の終了時刻です。残り" + remainText + "です。");
+  notify("まもなく会議終了", "会議終了 " + endLabel + "（残り " + fmtDur(remain) + "）");
+  persistRun();
 }
 
 function endMeeting() {
   R.ended = true;
   R.items.forEach((it) => {
-    if (it.status !== "done") it.status = "done";
+    if (it.status === "wait" || it.status === "run") it.status = "done";
   });
   R.idx = -1;
-  R.doneAll = true;
   beepEnd();
   showEndBanner();
   speakJa("終了");
   toast("会議の終了時刻です（日本時間 " + fmtClockRel(R.meetEndMs, R.planStartMs) + "）");
+  notify("会議終了", "会議の終了時刻です（日本時間 " + fmtClockRel(R.meetEndMs, R.planStartMs) + "）");
   releaseWakeLock();
+  try {
+    sessionStorage.removeItem(STORAGE_RUN);
+  } catch (e) {}
 }
 
 function tick() {
@@ -714,19 +930,22 @@ function tick() {
   const now = Date.now();
 
   if (!R.ended) {
-    if (now >= R.actStartMs) {
+    if (now >= R.meetEndMs) {
+      endMeeting();
+    } else if (now >= R.actStartMs) {
       const chain = autoComplete(now);
+      if (chain > 0) persistRun();
       if (!R.startAnnounced) {
         announceStart();
-      } else if (chain > 0 && now < R.meetEndMs) {
+      } else if (chain > 0) {
         showNextAfterChain(now);
       }
       fireCurrentPreAlarm(now);
+      fireMeetingPreAlarm(now);
     } else {
       fireStartPreAlarm(now);
+      fireMeetingPreAlarm(now);
     }
-    fireMeetingPreAlarm(now);
-    if (!R.ended && now >= R.meetEndMs) endMeeting();
   }
 
   renderRun(now);
@@ -741,30 +960,36 @@ const ST = {
 };
 
 function renderRun(now) {
-  $("soundBtn").textContent = soundOn ? "音声あり" : "音声なし";
+  updateSoundButton();
   $("jstRunClock").textContent = fmtHMS(now);
   $("meetEnd").textContent = fmtClockRel(R.meetEndMs, R.planStartMs);
   $("meetLeft").textContent = fmtDur(R.meetEndMs - now);
+  const waiting = now < R.actStartMs;
 
   if (R.ended) {
     $("curLabel").textContent = "会議";
     $("curName").textContent = "終了";
     $("curLeft").textContent = "終了";
     $("curLeft").className = "clock endjp";
+    $("curEndLabel").textContent = "会議終了";
     $("curEnd").textContent = fmtClockRel(R.meetEndMs, R.planStartMs);
     $("curPrev").textContent = "";
     $("curBar").style.width = "100%";
     $("nextName").textContent = "—";
     $("nextEnd").textContent = "--:--:--";
-  } else if (now < R.actStartMs) {
+  } else if (waiting) {
+    const startLabel = fmtClockRel(R.actStartMs, now);
+    let prev = "開始予定 " + fmtPlanStartLabel(R.actStartMs, now);
+    if (R.startPreEnabled && !R.startPreFired) prev += "　開始前アラーム " + fmtClockRel(R.startPreMs, now);
+    else if (R.startPreEnabled && R.startPreFired) prev += "　開始前アラーム済み";
+    else prev += "　開始時刻になると自動でタイマーが進みます";
     $("curLabel").textContent = "開始待ち";
     $("curName").textContent = "MTG開始まで";
     $("curLeft").textContent = fmtDur(R.actStartMs - now);
     $("curLeft").className = "clock small";
-    $("curEnd").textContent = fmtClock(R.actStartMs);
-    $("curPrev").textContent = R.startPreEnabled && !R.startPreFired
-      ? "開始前アラーム " + fmtClock(R.startPreMs)
-      : "開始時刻になると自動でタイマーが進みます";
+    $("curEndLabel").textContent = "MTG開始";
+    $("curEnd").textContent = startLabel;
+    $("curPrev").textContent = prev;
     $("curBar").style.width = "0%";
     $("nextName").textContent = R.idx >= 0 ? R.items[R.idx].name : "—";
     $("nextEnd").textContent = R.idx >= 0 ? fmtClockRel(R.items[R.idx].endMs, R.planStartMs) : "--:--:--";
@@ -775,12 +1000,13 @@ function renderRun(now) {
     if (it.note) note.push(it.note);
     if (R.preEndSec > 0) {
       const preMs = it.endMs - R.preEndSec * 1000;
-      if (!it.preFired && preMs > now) note.push("終了前アラーム " + fmtClock(preMs));
+      if (!it.preFired && preMs > now) note.push("終了前アラーム " + fmtClockRel(preMs, now));
     }
     $("curLabel").textContent = "いまの議題";
     $("curName").textContent = it.name;
     $("curLeft").textContent = rem > 0 ? fmtDur(rem) : "0:00";
     $("curLeft").className = "clock" + (rem <= 0 ? " fin" : rem <= 30000 ? " warn" : "");
+    $("curEndLabel").textContent = "この議題の終了";
     $("curEnd").textContent = fmtClockRel(it.endMs, R.planStartMs);
     $("curPrev").textContent = note.join("　");
     const win = Math.max(1000, it.endMs - it.anchorMs);
@@ -795,6 +1021,7 @@ function renderRun(now) {
     $("curName").textContent = "すべての議題が終了";
     $("curLeft").textContent = fmtDur(Math.max(0, R.meetEndMs - now));
     $("curLeft").className = "clock small";
+    $("curEndLabel").textContent = "会議終了";
     $("curEnd").textContent = fmtClockRel(R.meetEndMs, R.planStartMs);
     $("curPrev").textContent = "";
     $("curBar").style.width = "100%";
@@ -802,71 +1029,98 @@ function renderRun(now) {
     $("nextEnd").textContent = "--:--:--";
   }
 
-  const tl = $("timeline");
-  tl.innerHTML = "";
-  const total = Math.max(1, R.meetEndMs - R.planStartMs);
-  let prev = R.planStartMs;
-  R.items.forEach((it) => {
-    const d = Math.max(0, it.endMs - prev);
-    prev = it.endMs;
-    const seg = document.createElement("div");
-    seg.className = "seg " + (it.status === "run" ? "cur" : it.status === "wait" ? "fut" : it.status === "skip" ? "skip" : "past");
-    seg.style.flex = "0 0 " + (d / total * 100) + "%";
-    seg.title = it.name + "　終了 " + fmtClockRel(it.endMs, R.planStartMs) + (it.status === "skip" ? "（スキップ）" : "");
-    const sp = document.createElement("span");
-    sp.textContent = it.name;
-    seg.appendChild(sp);
-    tl.appendChild(seg);
-  });
-  if (R.meetEndMs - prev > 500) {
-    const seg = document.createElement("div");
-    seg.className = "seg fut";
-    seg.style.flex = "1 1 auto";
-    seg.title = "割り振り外の余白";
-    tl.appendChild(seg);
+  const key = (R.ended ? "E" : waiting ? "W" : "R") + "|" + R.idx + "|"
+    + R.items.map((it) => it.name + ":" + it.status + ":" + it.endMs + ":" + it.note).join("|");
+  if (key !== lastRenderKey) {
+    lastRenderKey = key;
+    const tl = $("timeline");
+    tl.innerHTML = "";
+    const total = Math.max(1, R.meetEndMs - R.planStartMs);
+    let prevEnd = R.planStartMs;
+    R.items.forEach((it) => {
+      const d = Math.max(0, it.endMs - prevEnd);
+      prevEnd = it.endMs;
+      const seg = document.createElement("div");
+      const cls = it.status === "run" ? (waiting ? "fut" : "cur") : it.status === "wait" ? "fut" : it.status === "skip" ? "skip" : "past";
+      seg.className = "seg " + cls;
+      seg.style.flex = "0 0 " + (d / total * 100) + "%";
+      seg.title = it.name + "　終了 " + fmtClockRel(it.endMs, R.planStartMs) + (it.status === "skip" ? "（スキップ）" : "");
+      const sp = document.createElement("span");
+      sp.textContent = it.name;
+      seg.appendChild(sp);
+      tl.appendChild(seg);
+    });
+    if (R.meetEndMs - prevEnd > 500) {
+      const seg = document.createElement("div");
+      seg.className = "seg fut";
+      seg.style.flex = "1 1 auto";
+      seg.title = "割り振り外の余白";
+      tl.appendChild(seg);
+    }
+
+    const body = $("runBody");
+    body.innerHTML = "";
+    runRowRefs = [];
+    R.items.forEach((it) => {
+      const tr = document.createElement("tr");
+      const td1 = document.createElement("td");
+      const b = document.createElement("b");
+      const isCurrent = it.status === "run" && !waiting;
+      b.textContent = it.name + (isCurrent ? "（実行中）" : "");
+      td1.appendChild(b);
+      if (it.note) {
+        const em = document.createElement("i");
+        em.style.cssText = "display:block;font-style:normal;color:var(--warn);font-size:11px";
+        em.textContent = "↳ " + it.note;
+        td1.appendChild(em);
+      }
+      const td2 = document.createElement("td");
+      td2.className = "num";
+      td2.textContent = fmtClockRel(it.endMs, R.planStartMs);
+      const td3 = document.createElement("td");
+      td3.className = "num";
+      const td4 = document.createElement("td");
+      const display = (waiting && it.status === "run") ? ["開始待ち", "wait"] : ST[it.status];
+      td4.className = "st " + display[1];
+      td4.textContent = display[0];
+      tr.appendChild(td1);
+      tr.appendChild(td2);
+      tr.appendChild(td3);
+      tr.appendChild(td4);
+      body.appendChild(tr);
+      runRowRefs.push(td3);
+    });
   }
 
-  const body = $("runBody");
-  body.innerHTML = "";
-  R.items.forEach((it) => {
-    const tr = document.createElement("tr");
-    const td1 = document.createElement("td");
-    const b = document.createElement("b");
-    b.textContent = it.name + (it.status === "run" ? "（実行中）" : "");
-    td1.appendChild(b);
-    if (it.note) {
-      const em = document.createElement("i");
-      em.style.cssText = "display:block;font-style:normal;color:var(--warn);font-size:11px";
-      em.textContent = "↳ " + it.note;
-      td1.appendChild(em);
-    }
-    const td2 = document.createElement("td");
-    td2.className = "num";
-    td2.textContent = fmtClockRel(it.endMs, R.planStartMs);
-    const td3 = document.createElement("td");
-    td3.className = "num";
-    td3.textContent = (it.status === "done" || it.status === "skip") ? "—" : fmtDur(Math.max(0, it.endMs - now));
-    const td4 = document.createElement("td");
-    td4.className = "st " + ST[it.status][1];
-    td4.textContent = ST[it.status][0];
-    tr.appendChild(td1);
-    tr.appendChild(td2);
-    tr.appendChild(td3);
-    tr.appendChild(td4);
-    body.appendChild(tr);
+  R.items.forEach((it, i) => {
+    const ref = runRowRefs[i];
+    if (ref) ref.textContent = (it.status === "done" || it.status === "skip") ? "—" : fmtDur(Math.max(0, it.endMs - now));
   });
 
   document.title = R.ended
     ? "終了｜MTGタイマー"
-    : now < R.actStartMs
+    : waiting
       ? "開始待ち " + $("curLeft").textContent + "｜MTGタイマー"
       : R.idx >= 0
         ? $("curLeft").textContent + " " + R.items[R.idx].name + "｜MTGタイマー"
         : "残り " + $("curLeft").textContent + "｜MTGタイマー";
 }
 
+function refreshPlanDate() {
+  const ps = parseTime($("planStart").value);
+  if (ps == null) {
+    $("planDateDisp").textContent = "開始予定：--";
+    return;
+  }
+  const total = clampNum($("totalMin").value, 0, 480) * 60;
+  const now = Date.now();
+  const planStartMs = total > 0 ? resolvePlanStartMs(ps, total, now) : todToMs(ps, now);
+  $("planDateDisp").textContent = "開始予定：" + fmtPlanStartLabel(planStartMs, now);
+}
+
 function setupClockTick() {
   $("jstSetupClock").textContent = fmtHMS(Date.now());
+  if (!$("setup").hidden) updateCalc(true);
 }
 
 $("addItem").addEventListener("click", () => {
@@ -874,9 +1128,19 @@ $("addItem").addEventListener("click", () => {
   renderRows();
 });
 
-["planStart", "totalMin", "preStartMin", "preEndSec"].forEach((id) => {
-  $(id).addEventListener("input", updateCalc);
-});
+function bindNumberField(id, min, max) {
+  const inp = $(id);
+  inp.addEventListener("input", () => updateCalc());
+  inp.addEventListener("change", () => {
+    inp.value = clampNum(inp.value, min, max);
+    updateCalc();
+  });
+}
+
+bindNumberField("totalMin", 1, 480);
+bindNumberField("preStartMin", 0, 60);
+bindNumberField("preEndSec", 0, 300);
+$("planStart").addEventListener("input", () => updateCalc());
 
 $("voiceTestBtn").addEventListener("click", () => {
   unlockAudio();
@@ -886,17 +1150,55 @@ $("voiceTestBtn").addEventListener("click", () => {
   toast("音声を再生しました。環境によっては日本語音声が出ない場合があります。");
 });
 
+$("notifyBtn").addEventListener("click", async () => {
+  if (!("Notification" in window)) {
+    toast("このブラウザは通知に対応していません。");
+    return;
+  }
+  try {
+    const permission = await Notification.requestPermission();
+    updateNotifyButton();
+    toast(permission === "granted"
+      ? "通知を有効にしました。タブが非表示のときも通知します。"
+      : "通知が許可されませんでした。ブラウザの設定を確認してください。");
+  } catch (e) {
+    toast("通知を有効にできませんでした。");
+  }
+});
+
+if (!document.documentElement.requestFullscreen) $("fsBtn").hidden = true;
+$("fsBtn").addEventListener("click", async () => {
+  try {
+    if (!document.fullscreenElement) {
+      await document.documentElement.requestFullscreen();
+    } else {
+      await document.exitFullscreen();
+    }
+  } catch (e) {
+    toast("全画面表示にできませんでした。");
+  }
+});
+
+document.addEventListener("fullscreenchange", () => {
+  $("fsBtn").textContent = document.fullscreenElement ? "全画面を終了" : "全画面";
+});
+
 $("startNowBtn").addEventListener("click", () => startRun("now"));
 $("startPlanBtn").addEventListener("click", () => startRun("plan"));
 
 $("skipBtn").addEventListener("click", () => {
   if (!R || R.idx < 0 || R.ended) return;
+  const now = Date.now();
+  if (now < actionLockUntil) return;
+  actionLockUntil = now + 500;
   unlockAudio();
   const cur = R.items[R.idx];
   cur.status = "skip";
   cur.note = "手動スキップ（終了時刻 " + fmtClock(cur.endMs) + "）";
   beepItem();
-  const next = advanceToNext(Date.now());
+  advanceToNext(now);
+  autoComplete(now);
+  const next = R.idx >= 0 ? R.items[R.idx] : null;
   if (next) {
     showBanner("次の内容に移ってください", "「" + next.name + "」　終了 " + fmtClockRel(next.endMs, R.planStartMs), "次の内容に移ってください。" + next.name, "pre", 7000);
     speakJa("次の内容に移ってください。" + next.name);
@@ -904,16 +1206,29 @@ $("skipBtn").addEventListener("click", () => {
     showBanner("この議題で終了です", "会議の終了時刻 " + fmtClockRel(R.meetEndMs, R.planStartMs) + " までもう少し続けます", "この議題で終わりです。", "pre", 7000);
     speakJa("この議題で終わりです。");
   }
-  renderRun(Date.now());
+  persistRun();
+  renderRun(now);
 });
 
 $("backBtn").addEventListener("click", () => {
-  if (!R || R.idx < 0 || R.ended) return;
+  if (!R || R.ended) return;
+  const now = Date.now();
+  if (now < actionLockUntil) return;
+  actionLockUntil = now + 500;
   let j = -1;
-  for (let i = R.idx - 1; i >= 0; i--) {
-    if (R.items[i].status === "done" || R.items[i].status === "skip") {
-      j = i;
-      break;
+  if (R.idx >= 0) {
+    for (let i = R.idx - 1; i >= 0; i--) {
+      if (R.items[i].status === "done" || R.items[i].status === "skip") {
+        j = i;
+        break;
+      }
+    }
+  } else {
+    for (let i = R.items.length - 1; i >= 0; i--) {
+      if (R.items[i].status === "done" || R.items[i].status === "skip") {
+        j = i;
+        break;
+      }
     }
   }
   if (j < 0) {
@@ -921,27 +1236,40 @@ $("backBtn").addEventListener("click", () => {
     return;
   }
   unlockAudio();
-  const from = R.items[R.idx];
+  const from = R.idx >= 0 ? R.items[R.idx] : null;
   const to = R.items[j];
+  const endMs = from ? from.endMs : R.meetEndMs;
   to.status = "run";
-  to.endMs = from.endMs;
-  to.anchorMs = Date.now();
+  to.endMs = endMs;
+  to.anchorMs = now;
   to.preFired = false;
-  to.endFired = false;
-  to.note = "再開（終了時刻 " + fmtClock(from.endMs) + " まで）";
-  from.status = "skip";
-  from.note = "前の議題へ譲渡（終了時刻 " + fmtClock(from.endMs) + "）";
+  suppressShortPreAlarm(to);
+  to.note = "再開（終了時刻 " + fmtClockRel(endMs, R.planStartMs) + " まで）";
+  if (from) {
+    from.status = "skip";
+    from.note = "前の議題へ譲渡（終了時刻 " + fmtClockRel(endMs, R.planStartMs) + "）";
+  }
   R.idx = j;
   beepItem();
   showBanner("前の内容に戻ります", "「" + to.name + "」　終了 " + fmtClockRel(to.endMs, R.planStartMs), "前の内容に戻ります。" + to.name, "pre", 7000);
   speakJa("前の内容に戻ります。" + to.name);
-  renderRun(Date.now());
+  persistRun();
+  renderRun(now);
 });
 
 $("soundBtn").addEventListener("click", () => {
+  const wasUnlocked = audioUnlocked;
   unlockAudio();
+  if (!wasUnlocked) {
+    soundOn = true;
+    setTimeout(() => {
+      updateSoundButton();
+      beepItem();
+    }, 60);
+    return;
+  }
   soundOn = !soundOn;
-  $("soundBtn").textContent = soundOn ? "音声あり" : "音声なし";
+  updateSoundButton();
   if (!soundOn) {
     try {
       if ("speechSynthesis" in window) speechSynthesis.cancel();
@@ -952,6 +1280,7 @@ $("soundBtn").addEventListener("click", () => {
 });
 
 $("quitBtn").addEventListener("click", () => {
+  if (R && !R.ended && !window.confirm("タイマーを終了して設定に戻りますか？")) return;
   R = null;
   if (tickTimer) {
     clearTimeout(tickTimer);
@@ -962,20 +1291,42 @@ $("quitBtn").addEventListener("click", () => {
     if ("speechSynthesis" in window) speechSynthesis.cancel();
   } catch (e) {}
   releaseWakeLock();
+  actionLockUntil = 0;
+  if (document.fullscreenElement) {
+    document.exitFullscreen().catch(() => {});
+  }
+  lastRenderKey = "";
+  runRowRefs = [];
+  try {
+    sessionStorage.removeItem(STORAGE_RUN);
+  } catch (e) {}
   $("run").hidden = true;
   $("setup").hidden = false;
   document.title = "MTGタイマー｜日本時間";
+  saveSetup();
   updateCalc();
 });
 
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible" && R && !R.ended) {
-    requestWakeLock();
-    tick();
+  if (document.visibilityState === "visible") {
+    if (R && !R.ended) {
+      unlockAudio();
+      requestWakeLock();
+      tick();
+    }
+  } else {
+    persistRun();
   }
 });
 
+window.addEventListener("pagehide", () => {
+  saveSetup();
+  persistRun();
+});
+
 window.addEventListener("beforeunload", (event) => {
+  saveSetup();
+  persistRun();
   if (R && !R.ended) {
     event.preventDefault();
     event.returnValue = "";
@@ -991,9 +1342,12 @@ try {
   }
 } catch (e) {}
 
+loadSetup();
 renderRows();
+updateNotifyButton();
 setupClockTick();
 setInterval(setupClockTick, 1000);
+restoreRun();
 })();
 </script>
 </body>
