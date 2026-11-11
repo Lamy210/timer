@@ -1,0 +1,531 @@
+import { test, expect } from "@playwright/test";
+import fs from "node:fs";
+
+const fakeNow = new Date("2026-11-12T01:00:00Z");
+
+async function setupPage(page, options = {}) {
+  const fakeClock = options.fakeClock !== false;
+  const clockTime = options.clockTime || fakeNow;
+  const errors = [];
+
+  page.on("dialog", (dialog) => dialog.accept().catch(() => {}));
+  page.on("console", (msg) => {
+    if (msg.type() === "error" && !/favicon/i.test(msg.text())) errors.push("console: " + msg.text());
+  });
+  page.on("pageerror", (err) => errors.push("pageerror: " + err.message));
+
+  await page.addInitScript(() => {
+    window.__spoken = [];
+    window.__beeps = 0;
+    window.__notifications = [];
+    window.__forceHidden = false;
+
+    class FakeAudioContext {
+      constructor() {
+        this.state = "running";
+        this.currentTime = 0;
+        this.destination = {};
+      }
+      resume() {
+        return Promise.resolve();
+      }
+      createOscillator() {
+        return {
+          type: "",
+          frequency: { value: 0 },
+          connect() {},
+          disconnect() {},
+          start(when) { window.__beeps++; (window.__startTimes || (window.__startTimes = [])).push(when); },
+          stop() {}
+        };
+      }
+      createGain() {
+        return {
+          gain: { value: 1, setValueAtTime() {}, linearRampToValueAtTime() {} },
+          connect() {},
+          disconnect() {}
+        };
+      }
+    }
+
+    window.AudioContext = FakeAudioContext;
+    window.webkitAudioContext = FakeAudioContext;
+
+    const fakeSpeech = {
+      getVoices() { return [{ lang: "ja-JP", name: "Fake Japanese" }]; },
+      cancel() {},
+      speak(utterance) { window.__spoken.push(utterance.text); }
+    };
+    Object.defineProperty(window, "speechSynthesis", { value: fakeSpeech, configurable: true });
+    window.SpeechSynthesisUtterance = class {
+      constructor(text) { this.text = text; }
+    };
+
+    class FakeNotification {
+      constructor(title, options) { window.__notifications.push({ title, options }); }
+    }
+    FakeNotification.permission = "default";
+    FakeNotification.requestPermission = async function () {
+      FakeNotification.permission = "granted";
+      return "granted";
+    };
+    window.Notification = FakeNotification;
+
+    Object.defineProperty(Document.prototype, "visibilityState", {
+      configurable: true,
+      get() { return window.__forceHidden ? "hidden" : "visible"; }
+    });
+  });
+
+  if (fakeClock) await page.clock.install({ time: clockTime });
+  await page.goto("/?no-sw=1");
+  return errors;
+}
+
+async function makeSingleAgenda(page, name, min, sec) {
+  const rows = page.locator("#agendaBody tr");
+  while (await rows.count() > 1) {
+    const count = await rows.count();
+    await page.locator(`#agendaBody tr:nth-child(${count}) td:nth-child(5) button`).click();
+  }
+  await page.locator("#agendaBody tr:nth-child(1) td:nth-child(1) input").fill(name);
+  await page.locator("#agendaBody tr:nth-child(1) td:nth-child(2) input").fill(String(min));
+  await page.locator("#agendaBody tr:nth-child(1) td:nth-child(3) input").fill(String(sec));
+}
+
+async function statuses(page) {
+  return page.locator("#runBody tr").evaluateAll((trs) => trs.map((tr) => tr.children[3].textContent));
+}
+
+test.describe("MTG timer", () => {
+  test("start now, pre-end alarm, agenda end, overrun, and finish", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#totalMin", "1");
+    await page.fill("#preEndSec", "2");
+    await makeSingleAgenda(page, "テスト議題", 0, 4);
+    await page.click("#startNowBtn");
+
+    await expect(page.locator("#run")).toBeVisible();
+    await expect(page.locator("#curName")).toHaveText("テスト議題");
+    await expect(page.locator("#bTitle")).toContainText("MTG開始");
+    expect(await page.evaluate(() => window.__spoken.join("\n"))).toContain("MTGを開始します");
+
+    await page.clock.fastForward(2200);
+    await expect(page.locator("#bTitle")).toContainText("まもなく終了");
+    expect(await page.evaluate(() => window.__spoken.join("\n"))).toContain("まもなく「テスト議題」が終了します");
+
+    await page.clock.fastForward(2000);
+    await expect(page.locator("#curName")).toHaveText("すべての議題が終了");
+    await expect(page.locator("#bTitle")).toContainText("議題はすべて終了");
+
+    await page.clock.fastForward(56000);
+    await expect(page.locator("#curName")).toHaveText("超過中");
+    await expect(page.locator("#bTitle")).toContainText("終了時刻を超過");
+    await expect(page.locator("#meetLeftLabel")).toHaveText("超過");
+    await expect(page.locator("#finishBtn")).toBeVisible();
+    await expect(page.locator("#skipBtn")).toBeHidden();
+    await expect(page.locator("#extendBtn")).toBeEnabled();
+
+    await page.click("#finishBtn");
+    await expect(page.locator("#curName")).toHaveText("終了");
+    await expect(page.locator("#bTitle")).toContainText(/終\s*了/);
+    await expect(page).toHaveTitle("終了｜MTGタイマー");
+    expect(errors).toEqual([]);
+  });
+
+  test("future alarms are pre-scheduled with Web Audio", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.click("#startNowBtn");
+    await page.waitForTimeout(50);
+    const startTimes = await page.evaluate(() => window.__startTimes || []);
+    expect(startTimes.some((time) => time > 0.5)).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test("scheduled start with pre-start alarm", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#planStart", "10:02:00");
+    await page.fill("#totalMin", "1");
+    await page.fill("#preStartMin", "1");
+    await page.fill("#preEndSec", "0");
+    await makeSingleAgenda(page, "開始テスト", 0, 30);
+    await page.click("#startPlanBtn");
+
+    await expect(page.locator("#curName")).toHaveText("MTG開始まで");
+    await expect(page.locator("#curLeft")).toHaveText(/^(2:00|1:59)$/);
+    await expect(page.locator("#curEndLabel")).toHaveText("MTG開始");
+    await expect(page.locator("#curPrev")).toContainText("開始予定 本日");
+
+    await page.clock.fastForward(60000);
+    await expect(page.locator("#bTitle")).toContainText("まもなくMTG開始");
+    expect(await page.evaluate(() => window.__spoken.join("\n"))).toContain("まもなくMTGが始まります");
+
+    await page.clock.fastForward(60000);
+    await expect(page.locator("#curName")).toHaveText("開始テスト");
+    await expect(page.locator("#bTitle")).toContainText("MTG開始");
+    expect(await page.evaluate(() => window.__spoken.join("\n"))).toContain("最初の議題は「開始テスト」です");
+    expect(errors).toEqual([]);
+  });
+
+  test("late scheduled start skips overdue agendas", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#planStart", "09:58:00");
+    await page.fill("#totalMin", "30");
+    await page.click("#startPlanBtn");
+
+    await expect(page.locator("#curName")).toContainText("議題1：報告");
+    await expect(page.locator("#runBody tr:nth-child(1) td:nth-child(4)")).toHaveText("スキップ");
+    await expect(page.locator("#runBody tr:nth-child(1)")).toContainText("開始遅延のためスキップ");
+    await expect(page.locator("#runBody tr:nth-child(2) td:nth-child(4)")).toHaveText("実行中");
+    await expect(page.locator("#runBody tr:nth-child(1) td:nth-child(2)")).toHaveText("9:59:00");
+    expect(errors).toEqual([]);
+  });
+
+  test("invalid agenda total is blocked", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#totalMin", "1");
+    await page.click("#startNowBtn");
+    await expect(page.locator("#run")).toBeHidden();
+    await expect(page.locator("#toast")).toContainText("割り振り合計が会議の長さを超えています");
+    expect(errors).toEqual([]);
+  });
+
+  test("banner does not block header controls", async ({ page }) => {
+    const errors = await setupPage(page);
+    expect(await page.evaluate(() => getComputedStyle(document.getElementById("banner")).pointerEvents)).toBe("none");
+    await page.click("#startNowBtn");
+    await page.click("#soundBtn");
+    expect(await page.evaluate(() => window.__beeps > 0)).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test("double-click skip only skips one agenda", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.click("#startNowBtn");
+    await page.dblclick("#skipBtn");
+    const result = await statuses(page);
+    expect(result[0]).toBe("スキップ");
+    expect(result[1]).toBe("実行中");
+    await expect(page.locator("#curName")).toContainText("議題1：報告");
+    expect(errors).toEqual([]);
+  });
+
+  test("number inputs normalize to clamped values", async ({ page }) => {
+    const errors = await setupPage(page);
+    const minutes = page.locator("#agendaBody tr:nth-child(1) td:nth-child(2) input");
+    await minutes.fill("999");
+    await page.locator("#planStart").click();
+    await expect(minutes).toHaveValue("600");
+    await expect(page.locator("#agendaBody tr:nth-child(1) td:nth-child(4)")).toHaveText("20:00:00");
+
+    await page.fill("#totalMin", "1000");
+    await page.locator("#planStart").click();
+    await expect(page.locator("#totalMin")).toHaveValue("480");
+    expect(errors).toEqual([]);
+  });
+
+  test("waiting state and start label are correct", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#planStart", "10:02:00");
+    await page.fill("#totalMin", "30");
+    await page.click("#startPlanBtn");
+    expect((await statuses(page))[0]).toBe("開始待ち");
+    await expect(page.locator("#curEndLabel")).toHaveText("MTG開始");
+    await expect(page.locator("#curPrev")).toContainText("開始予定 本日");
+    expect(errors).toEqual([]);
+  });
+
+  test("next-day scheduling is clearly indicated", async ({ page }) => {
+    const errors = await setupPage(page, { clockTime: new Date("2026-11-12T11:00:00Z") });
+    await page.fill("#planStart", "10:00:00");
+    await page.fill("#totalMin", "30");
+    await expect(page.locator("#planDateDisp")).toContainText("翌日");
+    await page.click("#startPlanBtn");
+    await expect(page.locator("#toast")).toContainText("開始予定は 翌日");
+    await expect(page.locator("#curPrev")).toContainText("開始予定 翌日");
+    await expect(page.locator("#curEnd")).toContainText("翌 10:00:00");
+    expect(errors).toEqual([]);
+  });
+
+  test("short agenda does not fire an immediate pre-end alarm", async ({ page }) => {
+    const errors = await setupPage(page);
+    await makeSingleAgenda(page, "短い議題", 0, 5);
+    await page.fill("#totalMin", "1");
+    await page.fill("#preEndSec", "30");
+    await page.click("#startNowBtn");
+    await page.clock.fastForward(300);
+    await expect(page.locator("#bTitle")).toHaveText("MTG開始");
+    await page.clock.fastForward(5000);
+    await expect(page.locator("#bTitle")).toContainText("議題はすべて終了");
+    expect(errors).toEqual([]);
+  });
+
+  test("skipped agenda stays skipped after overrun and finish", async ({ page }) => {
+    const errors = await setupPage(page);
+    await makeSingleAgenda(page, "スキップ確認", 0, 10);
+    await page.fill("#totalMin", "1");
+    await page.click("#startNowBtn");
+    await page.click("#skipBtn");
+    await page.clock.fastForward(61000);
+    expect((await statuses(page))[0]).toBe("スキップ");
+    await expect(page.locator("#curEndLabel")).toHaveText("予定終了");
+    await page.click("#finishBtn");
+    expect((await statuses(page))[0]).toBe("スキップ");
+    await expect(page.locator("#curEndLabel")).toHaveText("会議終了");
+    expect(errors).toEqual([]);
+  });
+
+  test("back works after all agendas are done", async ({ page }) => {
+    const errors = await setupPage(page);
+    await makeSingleAgenda(page, "戻る確認", 0, 1);
+    await page.fill("#totalMin", "1");
+    await page.click("#startNowBtn");
+    await page.clock.fastForward(1500);
+    await expect(page.locator("#curName")).toHaveText("すべての議題が終了");
+    await page.click("#backBtn");
+    await expect(page.locator("#curName")).toHaveText("戻る確認");
+    await expect(page.locator("#curEndLabel")).toHaveText("この議題の終了");
+    await expect(page.locator("#runBody tr:nth-child(1) td:nth-child(4)")).toHaveText("実行中");
+    expect(errors).toEqual([]);
+  });
+
+  test("run state restores after reload and audio can be re-enabled", async ({ page }) => {
+    const errors = await setupPage(page, { fakeClock: false });
+    await makeSingleAgenda(page, "復元確認", 0, 30);
+    await page.fill("#totalMin", "1");
+    await page.click("#startNowBtn");
+    await expect(page.locator("#run")).toBeVisible();
+    expect(await page.evaluate(() => !!sessionStorage.getItem("mtgTimer.run.v1"))).toBe(true);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(200);
+    await expect(page.locator("#run")).toBeVisible();
+    await expect(page.locator("#curName")).toHaveText("復元確認");
+    await expect(page.locator("#soundBtn")).toHaveText("音声を有効化");
+    await page.click("#soundBtn");
+    await page.waitForTimeout(150);
+    await expect(page.locator("#soundBtn")).toHaveText("音声あり");
+    expect(errors).toEqual([]);
+  });
+
+  test("overrun-off keeps the original hard stop", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.uncheck("#overrunMode");
+    await page.click("#startNowBtn");
+    await page.clock.fastForward(61 * 60 * 1000);
+    await expect(page.locator("#curName")).toHaveText("終了");
+    await expect(page.locator("#finishBtn")).toBeHidden();
+    await expect(page).toHaveTitle("終了｜MTGタイマー");
+    expect(errors).toEqual([]);
+  });
+
+  test("+5 minutes recovers from overrun and can finish", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.click("#startNowBtn");
+    await page.clock.fastForward(31 * 60 * 1000);
+    await expect(page.locator("#curName")).toHaveText("超過中");
+    await page.click("#extendBtn");
+    await expect(page.locator("#curName")).toHaveText("すべての議題が終了");
+    await expect(page.locator("#curLeft")).toHaveText(/^(5:00|4:59)$/);
+    await expect(page.locator("#meetEnd")).toHaveText("10:36:00");
+    await expect(page.locator("#finishBtn")).toBeVisible();
+    await page.clock.fastForward(5 * 60 * 1000 + 1000);
+    await expect(page.locator("#curName")).toHaveText("超過中");
+    await page.click("#finishBtn");
+    await expect(page.locator("#curName")).toHaveText("終了");
+    expect(errors).toEqual([]);
+  });
+
+  test("finish button also works after all agendas are done", async ({ page }) => {
+    const errors = await setupPage(page);
+    await makeSingleAgenda(page, "早期終了", 0, 1);
+    await page.fill("#totalMin", "1");
+    await page.click("#startNowBtn");
+    await page.clock.fastForward(1500);
+    await expect(page.locator("#curName")).toHaveText("すべての議題が終了");
+    await expect(page.locator("#finishBtn")).toBeVisible();
+    await expect(page.locator("#skipBtn")).toBeHidden();
+    await page.click("#finishBtn");
+    await expect(page.locator("#curName")).toHaveText("終了");
+    await expect(page).toHaveTitle("終了｜MTGタイマー");
+    expect(errors).toEqual([]);
+  });
+
+  test("+5 minutes extends the current and future schedule", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.click("#startNowBtn");
+    await page.clock.fastForward(25 * 60 * 1000);
+    await page.click("#extendBtn");
+    await expect(page.locator("#meetEnd")).toHaveText("10:35:00");
+    await expect(page.locator("#curEnd")).toHaveText("10:35:00");
+    await expect(page.locator("#finishBtn")).toBeHidden();
+    expect(errors).toEqual([]);
+  });
+
+  test("start-now-with-fixed-end supports an early start", async ({ page }) => {
+    const errors = await setupPage(page, { clockTime: new Date("2026-11-12T00:59:00Z") });
+    await page.fill("#totalMin", "30");
+    await expect(page.locator("#startFixedBtn")).toBeEnabled();
+    await page.click("#startFixedBtn");
+    await expect(page.locator("#curName")).toContainText("挨拶・議題確認");
+    await expect(page.locator("#meetEnd")).toHaveText("10:30:00");
+    await expect(page.locator("#toast")).toContainText("早く開始します。終了時刻は予定どおり");
+    expect(errors).toEqual([]);
+  });
+
+  test("large early start asks for confirmation", async ({ page }) => {
+    const errors = await setupPage(page, { clockTime: new Date("2026-11-11T23:00:00Z") });
+    await page.fill("#totalMin", "30");
+    await expect(page.locator("#startFixedBtn")).toBeEnabled();
+    await page.click("#startFixedBtn");
+    await expect(page.locator("#run")).toBeVisible();
+    await expect(page.locator("#meetEnd")).toHaveText("10:30:00");
+    await expect(page.locator("#toast")).toContainText("早く開始します");
+    expect(errors).toEqual([]);
+  });
+
+  test("fixed-end start supports a next-day start within two hours", async ({ page }) => {
+    const errors = await setupPage(page, { clockTime: new Date("2026-11-12T14:00:00Z") });
+    await page.fill("#planStart", "00:10:00");
+    await page.fill("#totalMin", "30");
+    await expect(page.locator("#startFixedBtn")).toBeEnabled();
+    await page.click("#startFixedBtn");
+    await expect(page.locator("#run")).toBeVisible();
+    await expect(page.locator("#meetEnd")).toHaveText("0:40:00");
+    await expect(page.locator("#toast")).toContainText("早く開始します");
+    expect(errors).toEqual([]);
+  });
+
+  test("start-now-with-fixed-end supports a late start", async ({ page }) => {
+    const errors = await setupPage(page, { clockTime: new Date("2026-11-12T01:05:00Z") });
+    await page.fill("#totalMin", "30");
+    await expect(page.locator("#startFixedBtn")).toBeEnabled();
+    await page.click("#startFixedBtn");
+    expect((await statuses(page))[0]).toBe("スキップ");
+    await expect(page.locator("#curName")).toContainText("議題1：報告");
+    await expect(page.locator("#meetEnd")).toHaveText("10:30:00");
+    await expect(page.locator("#toast")).toContainText("遅れて開始します");
+    expect(errors).toEqual([]);
+  });
+
+  test("fixed-end button is disabled after the planned meeting ended", async ({ page }) => {
+    const errors = await setupPage(page, { clockTime: new Date("2026-11-12T11:00:00Z") });
+    await page.fill("#planStart", "10:00:00");
+    await page.fill("#totalMin", "30");
+    await expect(page.locator("#startFixedBtn")).toBeDisabled();
+    await expect(page.locator("#nowEndDisp")).toContainText("終了 20:30:00");
+    expect(errors).toEqual([]);
+  });
+
+  test("fixed-end button is disabled when the plan resolves to tomorrow", async ({ page }) => {
+    const errors = await setupPage(page, { clockTime: new Date("2026-11-12T14:00:00Z") });
+    await page.fill("#planStart", "10:00:00");
+    await page.fill("#totalMin", "30");
+    await expect(page.locator("#startFixedBtn")).toBeDisabled();
+    await expect(page.locator("#planDateDisp")).toContainText("翌日");
+    expect(errors).toEqual([]);
+  });
+
+  test("recalculated start preview shows the next day", async ({ page }) => {
+    const errors = await setupPage(page, { clockTime: new Date("2026-11-12T14:50:00Z") });
+    await page.fill("#totalMin", "30");
+    await expect(page.locator("#nowEndDisp")).toContainText("翌 0:20:00");
+    expect(errors).toEqual([]);
+  });
+
+  test("overrun setting is persisted", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.uncheck("#overrunMode");
+    await page.waitForTimeout(300);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("mtgTimer.setup.v1")));
+    expect(saved.overrunMode).toBe(false);
+    expect(errors).toEqual([]);
+  });
+
+  test("template selection applies a preset", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.selectOption("#templateSelect", "short");
+    await page.click("#applyTemplateBtn");
+    await expect(page.locator("#totalMin")).toHaveValue("15");
+    expect(await page.locator("#agendaBody tr").count()).toBe(4);
+    await expect(page.locator("#agendaBody tr:nth-child(1) td:nth-child(1) input")).toHaveValue("挨拶");
+    await expect(page.locator("#sumDisp")).toHaveText("15:00");
+    expect(errors).toEqual([]);
+  });
+
+  test("JSON export downloads the current setup", async ({ page }) => {
+    const errors = await setupPage(page);
+    const downloadPromise = page.waitForEvent("download");
+    await page.click("#exportBtn");
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe("mtg-timer-settings.json");
+    const path = await download.path();
+    const data = JSON.parse(fs.readFileSync(path, "utf8"));
+    expect(data.app).toBe("mtg-timer");
+    expect(data.version).toBe(1);
+    expect(data.totalMin).toBe(30);
+    expect(data.rows).toHaveLength(4);
+    expect(errors).toEqual([]);
+  });
+
+  test("JSON import applies a setup", async ({ page }) => {
+    const errors = await setupPage(page);
+    const imported = {
+      planStart: "09:30:00",
+      totalMin: 20,
+      preStartMin: 3,
+      preEndSec: 20,
+      overrunMode: false,
+      rows: [
+        { name: "読込A", min: 2, sec: 0 },
+        { name: "読込B", min: 8, sec: 0 }
+      ]
+    };
+    await page.setInputFiles("#importFile", {
+      name: "settings.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(imported))
+    });
+    await expect(page.locator("#toast")).toContainText("設定を読み込みました");
+    await expect(page.locator("#planStart")).toHaveValue("09:30:00");
+    await expect(page.locator("#totalMin")).toHaveValue("20");
+    await expect(page.locator("#preStartMin")).toHaveValue("3");
+    await expect(page.locator("#preEndSec")).toHaveValue("20");
+    await expect(page.locator("#overrunMode")).not.toBeChecked();
+    expect(await page.locator("#agendaBody tr").count()).toBe(2);
+    await expect(page.locator("#agendaBody tr:nth-child(1) td:nth-child(1) input")).toHaveValue("読込A");
+    await expect(page.locator("#sumDisp")).toHaveText("10:00");
+    expect(errors).toEqual([]);
+  });
+
+  test("notification, ARIA, and fullscreen work", async ({ page }) => {
+    const errors = await setupPage(page);
+    await expect(page.locator("#banner")).toHaveAttribute("role", "alert");
+    await expect(page.locator("#toast")).toHaveAttribute("role", "status");
+    await page.click("#notifyBtn");
+    await page.waitForTimeout(50);
+    await expect(page.locator("#notifyBtn")).toHaveText("通知有効");
+    await page.evaluate(() => { window.__forceHidden = true; });
+    await page.click("#startNowBtn");
+    await page.clock.fastForward(31000);
+    await page.waitForTimeout(100);
+    const notifications = await page.evaluate(() => window.__notifications);
+    expect(notifications.some((n) => /まもなく終了/.test(n.title))).toBe(true);
+    await expect(page.locator("#soundBtn")).toHaveAttribute("aria-pressed", "true");
+    await page.click("#fsBtn");
+    await page.waitForTimeout(150);
+    expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test("PWA assets are available", async ({ page }) => {
+    await setupPage(page);
+    const manifestResponse = await page.request.get("/manifest.json");
+    expect(manifestResponse.ok()).toBe(true);
+    const manifest = await manifestResponse.json();
+    expect(manifest.name).toBe("MTGタイマー");
+    expect(manifest.icons.length).toBeGreaterThanOrEqual(2);
+    expect((await page.request.get("/icons/icon-192.png")).ok()).toBe(true);
+    expect((await page.request.get("/icons/icon-512.png")).ok()).toBe(true);
+    expect((await page.request.get("/sw.js")).ok()).toBe(true);
+  });
+});

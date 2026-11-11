@@ -13,7 +13,10 @@ GitHub Pages: https://lamy210.github.io/timer/
 - **開始時刻まで待機**: 予定時刻まで待機し、遅れた場合は終了済みの議題をスキップ
 - **超過表示**: 終了時刻を過ぎても自動終了せず、超過時間を表示。「会議を終了」で終了
 - **+5分延長**: 現在の議題と以降の予定、会議終了を5分延長
+- テンプレート（標準・短縮・長期）を適用可能
+- 設定のJSON書き出し・読み込みに対応
 - 音声は最初の操作で有効化。必要に応じて「通知を有効化」を押す
+- 対応ブラウザでは「アプリをインストール」でPWAとして追加可能
 - 実行中は全画面表示で投影可能
 - 同一タブで再読み込みした場合、実行状態を復元
 
@@ -23,7 +26,15 @@ GitHub Pages: https://lamy210.github.io/timer/
 - 通知は対応ブラウザと許可が必要です。iOSではPWA/OSの制約があります。
 - 音声が出ない場合は、実行画面の「音声を有効化」を押してください。
 
+## 開発
+
+- `npm install`
+- `npm test`（Playwright）
+- CIではテスト成功後にGitHub Pagesへデプロイ
+
 ## デプロイ
 
 - `.github/workflows/deploy-pages.yml` で `main` ブランチへのpush時に自動デプロイ
 - GitHub Pages の Source は「GitHub Actions」
+- PWAのService Workerでアプリ本体をキャッシュ（`public/sw.js`）
+- Service Workerのキャッシュを更新する場合は `public/sw.js` の `CACHE` を更新
