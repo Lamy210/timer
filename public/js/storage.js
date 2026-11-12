@@ -48,15 +48,15 @@ function normalizeRows(rows) {
 
 export function normalizeSetupData(saved) {
   if (!saved || typeof saved !== "object") return null;
-  if (saved.planStart == null && saved.totalMin == null && saved.preStartMin == null && saved.preEndSec == null && !Array.isArray(saved.rows)) {
+  const hasRows = Array.isArray(saved.rows) && saved.rows.length > 0;
+  if (saved.planStart == null && saved.totalMin == null && saved.preStartMin == null && saved.preEndSec == null && !hasRows) {
     return null;
   }
-  const data = {
-    totalMin: clampNum(saved.totalMin, 1, 480),
-    preStartMin: clampNum(saved.preStartMin, 0, 60),
-    preEndSec: clampNum(saved.preEndSec, 0, 300),
-    overrunMode: typeof saved.overrunMode === "boolean" ? saved.overrunMode : true
-  };
+  const data = {};
+  if (saved.totalMin != null) data.totalMin = clampNum(saved.totalMin, 1, 480);
+  if (saved.preStartMin != null) data.preStartMin = clampNum(saved.preStartMin, 0, 60);
+  if (saved.preEndSec != null) data.preEndSec = clampNum(saved.preEndSec, 0, 300);
+  if (typeof saved.overrunMode === "boolean") data.overrunMode = saved.overrunMode;
   if (typeof saved.planStart === "string" && parseTime(saved.planStart) != null) {
     data.planStart = saved.planStart;
   }

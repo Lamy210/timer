@@ -2,7 +2,7 @@
 
 GitHub Pages: https://lamy210.github.io/timer/
 
-日本時間（JST）基準のMTG用タイマーです。`public/index.html` をそのまま配信しています。
+日本時間（JST）基準のMTG用タイマーです。`public/` 以下をそのまま配信しています。
 
 ## 使い方
 

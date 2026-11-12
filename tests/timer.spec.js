@@ -507,6 +507,26 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("partial JSON import keeps unspecified settings", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#preStartMin", "4");
+    await page.fill("#preEndSec", "25");
+    await page.uncheck("#overrunMode");
+    await page.setInputFiles("#importFile", {
+      name: "rows-only.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify({ rows: [{ name: "部分読込", min: 5, sec: 0 }] }))
+    });
+    await expect(page.locator("#toast")).toContainText("設定を読み込みました");
+    await expect(page.locator("#totalMin")).toHaveValue("30");
+    await expect(page.locator("#preStartMin")).toHaveValue("4");
+    await expect(page.locator("#preEndSec")).toHaveValue("25");
+    await expect(page.locator("#overrunMode")).not.toBeChecked();
+    expect(await page.locator("#agendaBody tr").count()).toBe(1);
+    await expect(page.locator("#agendaBody tr:nth-child(1) td:nth-child(1) input")).toHaveValue("部分読込");
+    expect(errors).toEqual([]);
+  });
+
   test("notification, ARIA, and fullscreen work", async ({ page }) => {
     const errors = await setupPage(page);
     await expect(page.locator("#banner")).toHaveAttribute("role", "alert");
