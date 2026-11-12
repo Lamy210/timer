@@ -125,6 +125,34 @@ function renderRows() {
 
     const tdO = document.createElement("td");
     tdO.className = "op";
+    const up = document.createElement("button");
+    up.className = "mini";
+    up.type = "button";
+    up.textContent = "↑";
+    up.title = "上へ移動";
+    up.setAttribute("aria-label", "上へ移動");
+    up.disabled = i === 0;
+    up.addEventListener("click", () => {
+      if (i === 0) return;
+      const tmp = rows[i - 1];
+      rows[i - 1] = rows[i];
+      rows[i] = tmp;
+      renderRows();
+    });
+    const down = document.createElement("button");
+    down.className = "mini";
+    down.type = "button";
+    down.textContent = "↓";
+    down.title = "下へ移動";
+    down.setAttribute("aria-label", "下へ移動");
+    down.disabled = i === rows.length - 1;
+    down.addEventListener("click", () => {
+      if (i === rows.length - 1) return;
+      const tmp = rows[i + 1];
+      rows[i + 1] = rows[i];
+      rows[i] = tmp;
+      renderRows();
+    });
     const del = document.createElement("button");
     del.className = "mini";
     del.textContent = "削除";
@@ -134,6 +162,8 @@ function renderRows() {
       rows.splice(i, 1);
       renderRows();
     });
+    tdO.appendChild(up);
+    tdO.appendChild(down);
     tdO.appendChild(del);
 
     tr.appendChild(tdN);
@@ -557,7 +587,7 @@ function showBanner(title, sub, voiceText, kind, holdMs) {
 }
 
 function showEndBanner(manual, endMs) {
-  showBanner("終 了", (manual ? "会議を終了しました" : "会議の終了時刻です") + "（日本時間 " + fmtClockRel(endMs, R.planStartMs) + "）", "終了", "endj", 30000);
+  showBanner("終 了", (manual ? "会議を終了しました" : "会議の終了時刻です") + "（日本時間 " + fmtClockRel(endMs, Date.now()) + "）", "終了", "endj", 30000);
 }
 
 function hideBanner() {
@@ -596,7 +626,7 @@ function showNextAfterChain(now, beep) {
     speak("次の内容に移ってください。" + it.name);
     notify("次の議題", "「" + it.name + "」 終了 " + endLabel);
   } else if (R.meetEndMs > now) {
-    showBanner("議題はすべて終了", "会議の終了 " + fmtClockRel(R.meetEndMs, R.planStartMs) + " まで自由時間です", "議題はすべて終わりました。会議はまもなく終了します。", "pre", 7000);
+    showBanner("議題はすべて終了", "会議の終了 " + fmtClockRel(R.meetEndMs, now) + " まで自由時間です", "議題はすべて終わりました。会議はまもなく終了します。", "pre", 7000);
     speak("議題はすべて終わりました。会議はまもなく終了します。");
     notify("議題はすべて終了", "会議終了 " + fmtClockRel(R.meetEndMs, Date.now()));
   }
@@ -674,8 +704,8 @@ function endMeeting(manual) {
   if (manual) clearScheduled();
   showEndBanner(manual, endMs);
   speak(manual ? "会議を終了しました" : "終了");
-  toast((manual ? "会議を終了しました" : "会議の終了時刻です") + "（日本時間 " + fmtClockRel(endMs, R.planStartMs) + "）");
-  notify("会議終了", (manual ? "会議を終了しました" : "会議の終了時刻です") + "（日本時間 " + fmtClockRel(endMs, R.planStartMs) + "）");
+  toast((manual ? "会議を終了しました" : "会議の終了時刻です") + "（日本時間 " + fmtClockRel(endMs, Date.now()) + "）");
+  notify("会議終了", (manual ? "会議を終了しました" : "会議の終了時刻です") + "（日本時間 " + fmtClockRel(endMs, Date.now()) + "）");
   releaseWakeLock();
   clearRunData();
 }
@@ -732,7 +762,7 @@ function renderRun(now) {
   updateSoundButton();
   $("jstRunClock").textContent = fmtHMS(now);
   $("meetEndLabel").textContent = R.ended ? "終了時刻" : "会議終了";
-  $("meetEnd").textContent = fmtClockRel(R.ended && R.actualEndMs ? R.actualEndMs : R.meetEndMs, R.planStartMs);
+  $("meetEnd").textContent = fmtClockRel(R.ended && R.actualEndMs ? R.actualEndMs : R.meetEndMs, now);
   const overrun = !!R.overrun;
   const waiting = now < R.actStartMs;
   $("meetLeftLabel").textContent = overrun ? "超過" : "会議の残り";
@@ -749,7 +779,7 @@ function renderRun(now) {
     $("curLeft").textContent = "終了";
     $("curLeft").className = "clock endjp";
     $("curEndLabel").textContent = "会議終了";
-    $("curEnd").textContent = fmtClockRel(R.actualEndMs || R.meetEndMs, R.planStartMs);
+    $("curEnd").textContent = fmtClockRel(R.actualEndMs || R.meetEndMs, now);
     $("curPrev").textContent = "";
     $("curBar").style.width = "100%";
     $("nextName").textContent = "—";
@@ -760,7 +790,7 @@ function renderRun(now) {
     $("curLeft").textContent = "+" + fmtDur(now - R.meetEndMs);
     $("curLeft").className = "clock over";
     $("curEndLabel").textContent = "予定終了";
-    $("curEnd").textContent = fmtClockRel(R.meetEndMs, R.planStartMs);
+    $("curEnd").textContent = fmtClockRel(R.meetEndMs, now);
     $("curPrev").textContent = "「会議を終了」を押すまで継続します";
     $("curBar").style.width = "100%";
     $("nextName").textContent = "—";
@@ -781,7 +811,7 @@ function renderRun(now) {
     $("curPrev").textContent = prev;
     $("curBar").style.width = "0%";
     $("nextName").textContent = R.idx >= 0 ? R.items[R.idx].name : "—";
-    $("nextEnd").textContent = R.idx >= 0 ? fmtClockRel(R.items[R.idx].endMs, R.planStartMs) : "--:--:--";
+    $("nextEnd").textContent = R.idx >= 0 ? fmtClockRel(R.items[R.idx].endMs, now) : "--:--:--";
   } else if (R.idx >= 0) {
     const it = R.items[R.idx];
     const rem = it.endMs - now;
@@ -796,7 +826,7 @@ function renderRun(now) {
     $("curLeft").textContent = rem > 0 ? fmtDur(rem) : "0:00";
     $("curLeft").className = "clock" + (rem <= 0 ? " fin" : rem <= 30000 ? " warn" : "");
     $("curEndLabel").textContent = "この議題の終了";
-    $("curEnd").textContent = fmtClockRel(it.endMs, R.planStartMs);
+    $("curEnd").textContent = fmtClockRel(it.endMs, now);
     $("curPrev").textContent = note.join("　");
     const win = Math.max(1000, it.endMs - it.anchorMs);
     const pct = Math.max(0, Math.min(100, (now - it.anchorMs) / win * 100));
@@ -804,21 +834,21 @@ function renderRun(now) {
     let nx = R.idx + 1;
     while (nx < R.items.length && R.items[nx].status !== "wait") nx++;
     $("nextName").textContent = nx < R.items.length ? R.items[nx].name : "（最後の議題です）";
-    $("nextEnd").textContent = nx < R.items.length ? fmtClockRel(R.items[nx].endMs, R.planStartMs) : fmtClockRel(R.meetEndMs, R.planStartMs);
+    $("nextEnd").textContent = nx < R.items.length ? fmtClockRel(R.items[nx].endMs, now) : fmtClockRel(R.meetEndMs, now);
   } else {
     $("curLabel").textContent = "いまの議題";
     $("curName").textContent = "すべての議題が終了";
     $("curLeft").textContent = fmtDur(Math.max(0, R.meetEndMs - now));
     $("curLeft").className = "clock small";
     $("curEndLabel").textContent = "会議終了";
-    $("curEnd").textContent = fmtClockRel(R.meetEndMs, R.planStartMs);
+    $("curEnd").textContent = fmtClockRel(R.meetEndMs, now);
     $("curPrev").textContent = "";
     $("curBar").style.width = "100%";
     $("nextName").textContent = "—";
     $("nextEnd").textContent = "--:--:--";
   }
 
-  const key = (R.ended ? "E" : overrun ? "O" : waiting ? "W" : "R") + "|" + R.idx + "|" + R.meetEndMs + "|"
+  const key = (R.ended ? "E" : overrun ? "O" : waiting ? "W" : "R") + "|" + R.idx + "|" + R.meetEndMs + "|" + dayIndexJst(now) + "|"
     + R.items.map((it) => it.name + ":" + it.status + ":" + it.endMs + ":" + it.note).join("|");
   if (key !== lastRenderKey) {
     lastRenderKey = key;
@@ -833,7 +863,7 @@ function renderRun(now) {
       const cls = it.status === "run" ? (waiting ? "fut" : "cur") : it.status === "wait" ? "fut" : it.status === "skip" ? "skip" : "past";
       seg.className = "seg " + cls;
       seg.style.flex = "0 0 " + (d / total * 100) + "%";
-      seg.title = it.name + "　終了 " + fmtClockRel(it.endMs, R.planStartMs) + (it.status === "skip" ? "（スキップ）" : "");
+      seg.title = it.name + "　終了 " + fmtClockRel(it.endMs, now) + (it.status === "skip" ? "（スキップ）" : "");
       const sp = document.createElement("span");
       sp.textContent = it.name;
       seg.appendChild(sp);
@@ -865,7 +895,7 @@ function renderRun(now) {
       }
       const td2 = document.createElement("td");
       td2.className = "num";
-      td2.textContent = fmtClockRel(it.endMs, R.planStartMs);
+      td2.textContent = fmtClockRel(it.endMs, now);
       const td3 = document.createElement("td");
       td3.className = "num";
       const td4 = document.createElement("td");
@@ -1096,9 +1126,9 @@ $("extendBtn").addEventListener("click", () => {
     R.meetPreFired = !R.meetPreEnabled || R.meetPreMs <= now;
   }
 
-  showBanner("5分延長しました", "会議終了 " + fmtClockRel(R.meetEndMs, R.planStartMs), "5分延長しました。会議終了は" + fmtClockRel(R.meetEndMs, R.planStartMs) + "です。", "start", 7000);
+  showBanner("5分延長しました", "会議終了 " + fmtClockRel(R.meetEndMs, now), "5分延長しました。会議終了は" + fmtClockRel(R.meetEndMs, now) + "です。", "start", 7000);
   speak("5分延長しました。");
-  toast("5分延長しました（会議終了 " + fmtClockRel(R.meetEndMs, R.planStartMs) + "）");
+  toast("5分延長しました（会議終了 " + fmtClockRel(R.meetEndMs, now) + "）");
   persistRun();
   scheduleAlarms();
   renderRun(now);
@@ -1118,10 +1148,10 @@ $("skipBtn").addEventListener("click", () => {
   autoComplete(now);
   const next = R.idx >= 0 ? R.items[R.idx] : null;
   if (next) {
-    showBanner("次の内容に移ってください", "「" + next.name + "」　終了 " + fmtClockRel(next.endMs, R.planStartMs), "次の内容に移ってください。" + next.name, "pre", 7000);
+    showBanner("次の内容に移ってください", "「" + next.name + "」　終了 " + fmtClockRel(next.endMs, now), "次の内容に移ってください。" + next.name, "pre", 7000);
     speak("次の内容に移ってください。" + next.name);
   } else {
-    showBanner("この議題で終了です", "会議の終了時刻 " + fmtClockRel(R.meetEndMs, R.planStartMs) + " までもう少し続けます", "この議題で終わりです。", "pre", 7000);
+    showBanner("この議題で終了です", "会議の終了時刻 " + fmtClockRel(R.meetEndMs, now) + " までもう少し続けます", "この議題で終わりです。", "pre", 7000);
     speak("この議題で終わりです。");
   }
   persistRun();
@@ -1163,14 +1193,14 @@ $("backBtn").addEventListener("click", () => {
   to.anchorMs = now;
   to.preFired = false;
   suppressShortPreAlarm(to);
-  to.note = "再開（終了時刻 " + fmtClockRel(endMs, R.planStartMs) + " まで）";
+  to.note = "再開（終了時刻 " + fmtClockRel(endMs, Date.now()) + " まで）";
   if (from) {
     from.status = "skip";
-    from.note = "前の議題へ譲渡（終了時刻 " + fmtClockRel(endMs, R.planStartMs) + "）";
+    from.note = "前の議題へ譲渡（終了時刻 " + fmtClockRel(endMs, Date.now()) + "）";
   }
   R.idx = j;
   playSequence("item");
-  showBanner("前の内容に戻ります", "「" + to.name + "」　終了 " + fmtClockRel(to.endMs, R.planStartMs), "前の内容に戻ります。" + to.name, "pre", 7000);
+  showBanner("前の内容に戻ります", "「" + to.name + "」　終了 " + fmtClockRel(to.endMs, now), "前の内容に戻ります。" + to.name, "pre", 7000);
   speak("前の内容に戻ります。" + to.name);
   persistRun();
   scheduleAlarms();

@@ -86,7 +86,7 @@ async function makeSingleAgenda(page, name, min, sec) {
   const rows = page.locator("#agendaBody tr");
   while (await rows.count() > 1) {
     const count = await rows.count();
-    await page.locator(`#agendaBody tr:nth-child(${count}) td:nth-child(5) button`).click();
+    await page.locator(`#agendaBody tr:nth-child(${count}) td:nth-child(5) button`).last().click();
   }
   await page.locator("#agendaBody tr:nth-child(1) td:nth-child(1) input").fill(name);
   await page.locator("#agendaBody tr:nth-child(1) td:nth-child(2) input").fill(String(min));
@@ -207,6 +207,18 @@ test.describe("MTG timer", () => {
     expect(result[0]).toBe("スキップ");
     expect(result[1]).toBe("実行中");
     await expect(page.locator("#curName")).toContainText("議題1：報告");
+    expect(errors).toEqual([]);
+  });
+
+  test("agenda rows can be reordered", async ({ page }) => {
+    const errors = await setupPage(page);
+    const first = page.locator("#agendaBody tr:nth-child(1) td:nth-child(1) input");
+    await expect(first).toHaveValue("挨拶・議題確認");
+    await page.locator("#agendaBody tr:nth-child(1) td:nth-child(5) button[title=\"下へ移動\"]").click();
+    await expect(page.locator("#agendaBody tr:nth-child(1) td:nth-child(1) input")).toHaveValue("議題1：報告");
+    await expect(page.locator("#agendaBody tr:nth-child(2) td:nth-child(1) input")).toHaveValue("挨拶・議題確認");
+    await page.locator("#agendaBody tr:nth-child(2) td:nth-child(5) button[title=\"上へ移動\"]").click();
+    await expect(first).toHaveValue("挨拶・議題確認");
     expect(errors).toEqual([]);
   });
 
@@ -412,7 +424,7 @@ test.describe("MTG timer", () => {
     await expect(page.locator("#startFixedBtn")).toBeEnabled();
     await page.click("#startFixedBtn");
     await expect(page.locator("#run")).toBeVisible();
-    await expect(page.locator("#meetEnd")).toHaveText("0:40:00");
+    await expect(page.locator("#meetEnd")).toHaveText("翌 0:40:00");
     await expect(page.locator("#toast")).toContainText("早く開始します");
     expect(errors).toEqual([]);
   });
