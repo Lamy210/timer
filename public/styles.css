@@ -11,6 +11,7 @@ label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--sub)
 input{background:#0b0d12;border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:6px 8px;font-size:15px;font-family:inherit}
 input:focus{outline:1px solid var(--ac)}
 input[type=time]{width:176px;font-variant-numeric:tabular-nums}
+input[type=date]{width:160px;font-variant-numeric:tabular-nums}
 input[type=number]{width:80px;font-variant-numeric:tabular-nums}
 input.nm{width:100%}
 select{background:#0b0d12;border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:6px 8px;font-size:13px;font-family:inherit}

@@ -1,6 +1,6 @@
 import { TEMPLATES, loadSetupData, saveSetupData, loadRunData, saveRunData, clearRunData, serializeSetup, parseImportedSetup } from "./js/storage.js";
 import { getSoundOn, setSoundOn, isAudioUnlocked, unlockAudio, playSequence, scheduleSequence, clearScheduled, audioNow, speak, cancelSpeech, notify, requestNotificationPermission } from "./js/alerts.js";
-import { jstParts, fmtHMS, fmtClock, dayIndexJst, fmtClockRel, fmtPlanStartLabel, resolvePlanStartMs, getFixedStartInfo, fmtDur, remainSpeech, parseTime, todToMs, clampNum } from "./js/time.js";
+import { jstParts, fmtHMS, fmtClock, dayIndexJst, fmtClockRel, fmtPlanStartLabel, resolvePlanStartMs, getFixedStartInfoFromMs, dateTodToMs, fmtDur, remainSpeech, parseTime, todToMs, clampNum } from "./js/time.js";
 const $ = (id) => document.getElementById(id);
 
 let toastTimer = null;
@@ -177,14 +177,19 @@ function renderRows() {
   updateCalc();
 }
 
+function computePlanStartMs(ps, total, now) {
+  if (ps == null) return null;
+  const date = $("planDate").value;
+  if (date) return dateTodToMs(date, ps);
+  return total > 0 ? resolvePlanStartMs(ps, total, now) : todToMs(ps, now);
+}
+
 function updateCalc(skipSave) {
   const ps = parseTime($("planStart").value);
   const totalMin = clampNum($("totalMin").value, 0, 480);
   const total = totalMin * 60;
   const now = Date.now();
-  const planStartMs = ps == null
-    ? null
-    : total > 0 ? resolvePlanStartMs(ps, total, now) : todToMs(ps, now);
+  const planStartMs = computePlanStartMs(ps, total, now);
   let cum = 0;
   rows.forEach((r, i) => {
     cum += rowDur(r);
@@ -201,14 +206,18 @@ function updateCalc(skipSave) {
   $("nowEndDisp").textContent = total > 0
     ? "今すぐ開始（再計算）：終了 " + fmtClockRel(now + total * 1000, now)
     : "今すぐ開始（再計算）：終了 --";
-  const fixed = getFixedStartInfo(ps, total, now);
+  const fixed = getFixedStartInfoFromMs(planStartMs, total, now);
+  const planDate = $("planDate").value;
   $("startFixedBtn").disabled = !fixed;
   $("startFixedBtn").title = fixed
     ? "予定終了時刻を維持して今すぐ開始します"
-    : "予定が2時間以上先か、会議が終了済みです。「今すぐ開始（再計算）」または「開始時刻まで待機」を使ってください。";
+    : planDate && planStartMs == null
+      ? "開催日が不正です。日付を確認してください。"
+      : "予定が2時間以上先か、会議が終了済みです。「今すぐ開始（再計算）」または「開始時刻まで待機」を使ってください。";
 
   let msg = "";
   if (ps == null) msg = "MTG開始時刻を入力してください。";
+  else if (planDate && planStartMs == null) msg = "開催日を確認してください。";
   else if (total <= 0) msg = "会議の長さを入力してください。";
   else if (cum > total) msg = "割り振りが会議の長さを " + fmtDur((cum - total) * 1000) + " 超えています。";
   $("warn").textContent = msg;
@@ -239,6 +248,7 @@ let saveSetupTimer = null;
 function collectSetupData() {
   return {
     planStart: $("planStart").value,
+    planDate: $("planDate").value,
     totalMin: clampNum($("totalMin").value, 1, 480),
     preStartMin: clampNum($("preStartMin").value, 0, 60),
     preEndSec: clampNum($("preEndSec").value, 0, 300),
@@ -259,6 +269,7 @@ function scheduleSaveSetup() {
 function applySetupData(data) {
   if (!data) return false;
   if (data.planStart) $("planStart").value = data.planStart;
+  if (data.planDate !== undefined) $("planDate").value = data.planDate;
   if (data.totalMin != null) $("totalMin").value = data.totalMin;
   if (data.preStartMin != null) $("preStartMin").value = data.preStartMin;
   if (data.preEndSec != null) $("preEndSec").value = data.preEndSec;
@@ -466,14 +477,29 @@ function startRun(mode) {
 
   if (mode === "now") {
     planStartMs = Math.floor(now / 1000) * 1000;
+    $("planDate").value = "";
   } else {
     const ps = parseTime($("planStart").value);
     if (ps == null) {
       toast("MTG開始時刻（日本時間）を入力してください。");
       return;
     }
+    const planDateValue = $("planDate").value;
+    if (planDateValue) {
+      planStartMs = dateTodToMs(planDateValue, ps);
+      if (planStartMs == null) {
+        toast("開催日が不正です。日付を確認してください。");
+        return;
+      }
+      if (now >= planStartMs + totalSec * 1000) {
+        toast("指定した日時は会議終了時刻を過ぎています。日付を確認するか、「今すぐ開始（再計算）」を使ってください。");
+        return;
+      }
+    } else {
+      planStartMs = resolvePlanStartMs(ps, totalSec, now);
+    }
     if (mode === "fixed") {
-      const info = getFixedStartInfo(ps, totalSec, now);
+      const info = getFixedStartInfoFromMs(planStartMs, totalSec, now);
       if (!info) {
         toast("予定が2時間以上先か、会議が終了済みです。「今すぐ開始（再計算）」または「開始時刻まで待機」を使ってください。");
         return;
@@ -482,8 +508,6 @@ function startRun(mode) {
       if (planStartMs - now > 60 * 60 * 1000) {
         if (!window.confirm("予定より " + fmtDur(planStartMs - now) + " 早く開始します。終了時刻は予定どおりです。よろしいですか？")) return;
       }
-    } else {
-      planStartMs = resolvePlanStartMs(ps, totalSec, now);
     }
   }
 
@@ -977,7 +1001,11 @@ function refreshPlanDate() {
   }
   const total = clampNum($("totalMin").value, 0, 480) * 60;
   const now = Date.now();
-  const planStartMs = total > 0 ? resolvePlanStartMs(ps, total, now) : todToMs(ps, now);
+  const planStartMs = computePlanStartMs(ps, total, now);
+  if (planStartMs == null) {
+    $("planDateDisp").textContent = "開始予定：日付が不正です";
+    return;
+  }
   $("planDateDisp").textContent = "開始予定：" + fmtPlanStartLabel(planStartMs, now);
 }
 
@@ -1089,6 +1117,7 @@ bindNumberField("totalMin", 1, 480);
 bindNumberField("preStartMin", 0, 60);
 bindNumberField("preEndSec", 0, 300);
 $("planStart").addEventListener("input", () => updateCalc());
+$("planDate").addEventListener("input", () => updateCalc());
 $("overrunMode").addEventListener("change", scheduleSaveSetup);
 
 $("voiceTestBtn").addEventListener("click", () => {

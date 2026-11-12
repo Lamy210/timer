@@ -1,4 +1,4 @@
-import { clampNum, parseTime } from "./time.js";
+import { clampNum, parseTime, isValidDateString } from "./time.js";
 
 export const STORAGE_SETUP = "mtgTimer.setup.v1";
 export const STORAGE_RUN = "mtgTimer.run.v1";
@@ -49,7 +49,7 @@ function normalizeRows(rows) {
 export function normalizeSetupData(saved) {
   if (!saved || typeof saved !== "object") return null;
   const hasRows = Array.isArray(saved.rows) && saved.rows.length > 0;
-  if (saved.planStart == null && saved.totalMin == null && saved.preStartMin == null && saved.preEndSec == null && !hasRows) {
+  if (saved.planStart == null && saved.planDate == null && saved.totalMin == null && saved.preStartMin == null && saved.preEndSec == null && !hasRows) {
     return null;
   }
   const data = {};
@@ -59,6 +59,9 @@ export function normalizeSetupData(saved) {
   if (typeof saved.overrunMode === "boolean") data.overrunMode = saved.overrunMode;
   if (typeof saved.planStart === "string" && parseTime(saved.planStart) != null) {
     data.planStart = saved.planStart;
+  }
+  if (typeof saved.planDate === "string" && isValidDateString(saved.planDate)) {
+    data.planDate = saved.planDate;
   }
   const rows = normalizeRows(saved.rows);
   if (rows && rows.length) data.rows = rows;

@@ -433,6 +433,46 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("explicit future date is honored", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#planDate", "2026-11-20");
+    await page.fill("#planStart", "10:00:00");
+    await page.fill("#totalMin", "30");
+    await expect(page.locator("#planDateDisp")).toContainText("8日後");
+    await expect(page.locator("#planDateDisp")).toContainText("11/20");
+    await expect(page.locator("#startFixedBtn")).toBeDisabled();
+    await page.click("#startPlanBtn");
+    await expect(page.locator("#run")).toBeVisible();
+    await expect(page.locator("#curName")).toHaveText("MTG開始まで");
+    await expect(page.locator("#curPrev")).toContainText("11/20");
+    await expect(page.locator("#curPrev")).toContainText("8日後");
+    await expect(page.locator("#curEnd")).toContainText("8日後 10:00:00");
+    expect(errors).toEqual([]);
+  });
+
+  test("explicit ended date is rejected", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#planDate", "2026-11-11");
+    await page.fill("#planStart", "10:00:00");
+    await page.fill("#totalMin", "30");
+    await expect(page.locator("#planDateDisp")).toContainText("前日");
+    await expect(page.locator("#startFixedBtn")).toBeDisabled();
+    await page.click("#startPlanBtn");
+    await expect(page.locator("#run")).toBeHidden();
+    await expect(page.locator("#toast")).toContainText("指定した日時は会議終了時刻を過ぎています");
+    expect(errors).toEqual([]);
+  });
+
+  test("start now clears an explicit date", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#planDate", "2026-11-20");
+    await page.fill("#totalMin", "30");
+    await page.click("#startNowBtn");
+    await expect(page.locator("#run")).toBeVisible();
+    await expect(page.locator("#planDate")).toHaveValue("");
+    expect(errors).toEqual([]);
+  });
+
   test("fixed-end start supports a next-day start within two hours", async ({ page }) => {
     const errors = await setupPage(page, { clockTime: new Date("2026-11-12T14:00:00Z") });
     await page.fill("#planStart", "00:10:00");
@@ -514,6 +554,7 @@ test.describe("MTG timer", () => {
 
   test("JSON export downloads the current setup", async ({ page }) => {
     const errors = await setupPage(page);
+    await page.fill("#planDate", "2026-11-20");
     const downloadPromise = page.waitForEvent("download");
     await page.click("#exportBtn");
     const download = await downloadPromise;
@@ -523,6 +564,7 @@ test.describe("MTG timer", () => {
     expect(data.app).toBe("mtg-timer");
     expect(data.version).toBe(1);
     expect(data.totalMin).toBe(30);
+    expect(data.planDate).toBe("2026-11-20");
     expect(data.rows).toHaveLength(4);
     expect(errors).toEqual([]);
   });
@@ -531,6 +573,7 @@ test.describe("MTG timer", () => {
     const errors = await setupPage(page);
     const imported = {
       planStart: "09:30:00",
+      planDate: "2026-11-20",
       totalMin: 20,
       preStartMin: 3,
       preEndSec: 20,
@@ -548,6 +591,7 @@ test.describe("MTG timer", () => {
     await expect(page.locator("#toast")).toContainText("設定を読み込みました");
     await expect(page.locator("#planStart")).toHaveValue("09:30:00");
     await expect(page.locator("#totalMin")).toHaveValue("20");
+    await expect(page.locator("#planDate")).toHaveValue("2026-11-20");
     await expect(page.locator("#preStartMin")).toHaveValue("3");
     await expect(page.locator("#preEndSec")).toHaveValue("20");
     await expect(page.locator("#overrunMode")).not.toBeChecked();

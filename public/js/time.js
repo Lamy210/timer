@@ -33,7 +33,7 @@ export function dayIndexJst(ms) {
 
 export function fmtClockRel(ms, refMs) {
   const diff = dayIndexJst(ms) - dayIndexJst(refMs);
-  const prefix = diff === 1 ? "翌 " : diff > 1 ? "+" + diff + "日 " : diff === -1 ? "前日 " : diff < -1 ? Math.abs(diff) + "日前 " : "";
+  const prefix = diff === 1 ? "翌 " : diff > 1 ? diff + "日後 " : diff === -1 ? "前日 " : diff < -1 ? Math.abs(diff) + "日前 " : "";
   return prefix + fmtClock(ms);
 }
 
@@ -55,9 +55,30 @@ export function resolvePlanStartMs(todSec, totalSec, nowMs) {
   return ms;
 }
 
-export function getFixedStartInfo(ps, totalSec, nowMs) {
-  if (ps == null || totalSec <= 0) return null;
-  const planStartMs = todToMs(ps, nowMs);
+export function parseDateString(dateStr) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateStr || ""));
+  if (!m) return null;
+  const y = Number(m[1]);
+  const mo = Number(m[2]) - 1;
+  const d = Number(m[3]);
+  const utc = Date.UTC(y, mo, d);
+  const check = new Date(utc);
+  if (check.getUTCFullYear() !== y || check.getUTCMonth() !== mo || check.getUTCDate() !== d) return null;
+  return { y: y, mo: mo, d: d };
+}
+
+export function dateTodToMs(dateStr, todSec) {
+  const p = parseDateString(dateStr);
+  if (!p) return null;
+  return Date.UTC(p.y, p.mo, p.d) - JST_OFFSET_MS + todSec * 1000;
+}
+
+export function isValidDateString(dateStr) {
+  return parseDateString(dateStr) != null;
+}
+
+export function getFixedStartInfoFromMs(planStartMs, totalSec, nowMs) {
+  if (!Number.isFinite(planStartMs) || totalSec <= 0) return null;
   const meetEndMs = planStartMs + totalSec * 1000;
   if (nowMs >= meetEndMs) return null;
   if (planStartMs > nowMs && planStartMs - nowMs > 2 * 60 * 60 * 1000) return null;
