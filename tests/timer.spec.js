@@ -235,6 +235,16 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("missed pre-start alarm is explained", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#planStart", "10:02:00");
+    await page.fill("#totalMin", "30");
+    await page.fill("#preStartMin", "5");
+    await page.click("#startPlanBtn");
+    await expect(page.locator("#curPrev")).toContainText("開始前アラームは時間切れ");
+    expect(errors).toEqual([]);
+  });
+
   test("next-day scheduling is clearly indicated", async ({ page }) => {
     const errors = await setupPage(page, { clockTime: new Date("2026-11-12T11:00:00Z") });
     await page.fill("#planStart", "10:00:00");

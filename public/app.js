@@ -274,6 +274,7 @@ function restoreRun() {
     R.startPreEnabled = !!R.startPreEnabled;
     R.meetPreEnabled = !!R.meetPreEnabled;
     R.startPreFired = !!R.startPreFired;
+    R.startPreMissed = !!R.startPreMissed;
     R.meetPreFired = !!R.meetPreFired;
     R.startBeepScheduled = false;
     R.startPreBeepScheduled = false;
@@ -502,6 +503,7 @@ function startRun(mode) {
     startPreEnabled: startPreEnabled,
     startPreMs: startPreMs,
     startPreFired: !startPreEnabled || startPreMs <= now,
+    startPreMissed: startPreEnabled && startPreMs <= now,
     meetPreEnabled: meetPreEnabled,
     meetPreMs: meetPreMs,
     meetPreFired: !meetPreEnabled || meetPreMs <= actStartMs,
@@ -767,6 +769,7 @@ function renderRun(now) {
     const startLabel = fmtClockRel(R.actStartMs, now);
     let prev = "開始予定 " + fmtPlanStartLabel(R.actStartMs, now);
     if (R.startPreEnabled && !R.startPreFired) prev += "　開始前アラーム " + fmtClockRel(R.startPreMs, now);
+    else if (R.startPreEnabled && R.startPreMissed) prev += "　開始前アラームは時間切れ";
     else if (R.startPreEnabled && R.startPreFired) prev += "　開始前アラーム済み";
     else prev += "　開始時刻になると自動でタイマーが進みます";
     $("curLabel").textContent = "開始待ち";
