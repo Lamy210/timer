@@ -105,6 +105,7 @@ function renderRows() {
     const inp = document.createElement("input");
     inp.className = "nm";
     inp.type = "text";
+    inp.maxLength = 200;
     inp.value = r.name;
     inp.placeholder = "議題" + (i + 1);
     inp.setAttribute("aria-label", "議題" + (i + 1) + "の名前");
@@ -731,14 +732,14 @@ function renderRun(now) {
   $("meetEndLabel").textContent = R.ended ? "終了時刻" : "会議終了";
   $("meetEnd").textContent = fmtClockRel(R.ended && R.actualEndMs ? R.actualEndMs : R.meetEndMs, R.planStartMs);
   const overrun = !!R.overrun;
+  const waiting = now < R.actStartMs;
   $("meetLeftLabel").textContent = overrun ? "超過" : "会議の残り";
   $("meetLeft").textContent = overrun ? fmtDur(now - R.meetEndMs) : fmtDur(Math.max(0, R.meetEndMs - now));
   $("meetLeft").classList.toggle("over", overrun);
-  $("finishBtn").hidden = R.ended || !(overrun || R.idx < 0);
+  $("finishBtn").hidden = R.ended || waiting;
   $("skipBtn").hidden = overrun || R.ended || R.idx < 0;
   $("backBtn").hidden = overrun || R.ended;
   $("extendBtn").hidden = R.ended;
-  const waiting = now < R.actStartMs;
 
   if (R.ended) {
     $("curLabel").textContent = "会議";
@@ -911,6 +912,10 @@ function setupClockTick() {
 }
 
 $("addItem").addEventListener("click", () => {
+  if (rows.length >= 100) {
+    toast("議題は100件までです。");
+    return;
+  }
   rows.push({ name: "", min: 5, sec: 0 });
   renderRows();
 });
@@ -1053,6 +1058,7 @@ $("startPlanBtn").addEventListener("click", () => startRun("plan"));
 
 $("finishBtn").addEventListener("click", () => {
   if (!R || R.ended) return;
+  if (!window.confirm("会議を終了しますか？")) return;
   endMeeting(true);
   renderRun(Date.now());
 });

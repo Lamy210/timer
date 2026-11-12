@@ -35,6 +35,8 @@ button.mini{padding:2px 8px;font-size:12px;margin-left:4px}
 button.acc{background:var(--ac2);border-color:var(--ac2);color:#fff;font-weight:700;padding:10px 22px;font-size:15px}
 button.acc:hover{background:var(--ac)}
 button.big{font-size:15px;padding:10px 18px}
+button.danger{border-color:rgba(248,113,113,.55);color:var(--red)}
+button.danger:hover{border-color:var(--red);background:rgba(248,113,113,.1)}
 button:disabled{opacity:.4;cursor:not-allowed}
 .totals{margin:10px 0 14px;font-size:14px;color:var(--sub)}
 .totals b{color:var(--tx);font-variant-numeric:tabular-nums}

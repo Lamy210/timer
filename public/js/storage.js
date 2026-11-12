@@ -40,7 +40,7 @@ export const TEMPLATES = {
 function normalizeRows(rows) {
   if (!Array.isArray(rows)) return null;
   return rows.slice(0, 100).map((row) => ({
-    name: String(row && row.name || ""),
+    name: String(row && row.name || "").slice(0, 200),
     min: clampNum(row && row.min, 0, 600),
     sec: clampNum(row && row.sec, 0, 59)
   }));

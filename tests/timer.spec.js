@@ -350,6 +350,18 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("finish ends the meeting from a running agenda", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.click("#startNowBtn");
+    await expect(page.locator("#finishBtn")).toBeVisible();
+    await page.click("#finishBtn");
+    await expect(page.locator("#curName")).toHaveText("終了");
+    await expect(page.locator("#curEndLabel")).toHaveText("会議終了");
+    await expect(page.locator("#curEnd")).toHaveText("10:00:00");
+    await expect(page.locator("#meetEndLabel")).toHaveText("終了時刻");
+    expect(errors).toEqual([]);
+  });
+
   test("+5 minutes extends the current and future schedule", async ({ page }) => {
     const errors = await setupPage(page);
     await page.click("#startNowBtn");
@@ -357,7 +369,7 @@ test.describe("MTG timer", () => {
     await page.click("#extendBtn");
     await expect(page.locator("#meetEnd")).toHaveText("10:35:00");
     await expect(page.locator("#curEnd")).toHaveText("10:35:00");
-    await expect(page.locator("#finishBtn")).toBeHidden();
+    await expect(page.locator("#finishBtn")).toBeVisible();
     expect(errors).toEqual([]);
   });
 
