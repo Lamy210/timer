@@ -758,6 +758,49 @@ const ST = {
   skip: ["スキップ", "skipc"]
 };
 
+function buildSummary() {
+  const now = Date.now();
+  const actualEnd = R.actualEndMs || R.meetEndMs;
+  const lines = [
+    "MTGタイマー結果",
+    "開始: " + fmtClockRel(R.actStartMs, now),
+    "終了: " + fmtClockRel(actualEnd, now) + "（予定 " + fmtClockRel(R.meetEndMs, now) + "）",
+    "実際の長さ: " + fmtDur(actualEnd - R.actStartMs),
+    "予定の長さ: " + fmtDur(R.meetEndMs - R.planStartMs),
+    ""
+  ];
+  R.items.forEach((it) => {
+    lines.push("- " + it.name + " | 予定終了 " + fmtClockRel(it.endMs, now) + " | " + ST[it.status][0] + (it.note ? " | " + it.note : ""));
+  });
+  return lines.join("\n");
+}
+
+function fallbackCopy(text) {
+  return new Promise((resolve, reject) => {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand("copy");
+      resolve();
+    } catch (e) {
+      reject(e);
+    } finally {
+      ta.remove();
+    }
+  });
+}
+
+function copyText(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+  }
+  return fallbackCopy(text);
+}
+
 function renderRun(now) {
   updateSoundButton();
   $("jstRunClock").textContent = fmtHMS(now);
@@ -772,6 +815,7 @@ function renderRun(now) {
   $("skipBtn").hidden = overrun || R.ended || R.idx < 0;
   $("backBtn").hidden = overrun || R.ended;
   $("extendBtn").hidden = R.ended;
+  $("copyBtn").hidden = !R.ended;
 
   if (R.ended) {
     $("curLabel").textContent = "会議";
@@ -780,7 +824,9 @@ function renderRun(now) {
     $("curLeft").className = "clock endjp";
     $("curEndLabel").textContent = "会議終了";
     $("curEnd").textContent = fmtClockRel(R.actualEndMs || R.meetEndMs, now);
-    $("curPrev").textContent = "";
+    $("curPrev").textContent = "開始 " + fmtClockRel(R.actStartMs, now)
+      + "　／　終了 " + fmtClockRel(R.actualEndMs || R.meetEndMs, now)
+      + "（予定 " + fmtClockRel(R.meetEndMs, now) + "）";
     $("curBar").style.width = "100%";
     $("nextName").textContent = "—";
     $("nextEnd").textContent = "--:--:--";
@@ -1223,6 +1269,16 @@ $("soundBtn").addEventListener("click", () => {
   updateSoundButton();
   if (!next) cancelSpeech();
   else playSequence("item");
+});
+
+$("copyBtn").addEventListener("click", async () => {
+  if (!R || !R.ended) return;
+  try {
+    await copyText(buildSummary());
+    toast("会議結果をコピーしました。");
+  } catch (e) {
+    toast("コピーできませんでした。");
+  }
 });
 
 $("quitBtn").addEventListener("click", () => {

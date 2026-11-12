@@ -75,6 +75,13 @@ async function setupPage(page, options = {}) {
       configurable: true,
       get() { return window.__forceHidden ? "hidden" : "visible"; }
     });
+
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        writeText: async (text) => { window.__copiedText = text; }
+      }
+    });
   });
 
   if (fakeClock) await page.clock.install({ time: clockTime });
@@ -381,6 +388,15 @@ test.describe("MTG timer", () => {
     await expect(page.locator("#curEndLabel")).toHaveText("会議終了");
     await expect(page.locator("#curEnd")).toHaveText("10:00:00");
     await expect(page.locator("#meetEndLabel")).toHaveText("終了時刻");
+    await expect(page.locator("#curPrev")).toContainText("開始 10:00:00");
+    await expect(page.locator("#curPrev")).toContainText("予定 10:30:00");
+    await expect(page.locator("#copyBtn")).toBeVisible();
+    await page.click("#copyBtn");
+    await page.waitForTimeout(50);
+    const copied = await page.evaluate(() => window.__copiedText || "");
+    expect(copied).toContain("MTGタイマー結果");
+    expect(copied).toContain("挨拶・議題確認");
+    expect(copied).toContain("開始: 10:00:00");
     expect(errors).toEqual([]);
   });
 
