@@ -4,12 +4,12 @@ import { jstParts, fmtHMS, fmtClock, dayIndexJst, fmtClockRel, fmtPlanStartLabel
 const $ = (id) => document.getElementById(id);
 
 let toastTimer = null;
-function toast(msg) {
+function toast(msg, duration) {
   const t = $("toast");
   t.textContent = msg;
   t.classList.add("on");
   if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove("on"), 4000);
+  toastTimer = setTimeout(() => t.classList.remove("on"), duration || 4000);
 }
 
 function updateSoundButton() {
@@ -1345,7 +1345,17 @@ try {
 
 if ("serviceWorker" in navigator && !navigator.webdriver && !location.search.includes("no-sw")) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch(() => {});
+    navigator.serviceWorker.register("./sw.js", { scope: "./" }).then((registration) => {
+      registration.addEventListener("updatefound", () => {
+        const worker = registration.installing;
+        if (!worker) return;
+        worker.addEventListener("statechange", () => {
+          if (worker.state === "installed" && navigator.serviceWorker.controller) {
+            toast("新しいバージョンがあります。再読み込みしてください。", 8000);
+          }
+        });
+      });
+    }).catch(() => {});
   });
 }
 
