@@ -48,11 +48,14 @@ function normalizeRows(rows) {
 
 export function normalizeSetupData(saved) {
   if (!saved || typeof saved !== "object") return null;
+  if (saved.planStart == null && saved.totalMin == null && saved.preStartMin == null && saved.preEndSec == null && !Array.isArray(saved.rows)) {
+    return null;
+  }
   const data = {
     totalMin: clampNum(saved.totalMin, 1, 480),
     preStartMin: clampNum(saved.preStartMin, 0, 60),
     preEndSec: clampNum(saved.preEndSec, 0, 300),
-    overrunMode: saved.overrunMode !== false
+    overrunMode: typeof saved.overrunMode === "boolean" ? saved.overrunMode : true
   };
   if (typeof saved.planStart === "string" && parseTime(saved.planStart) != null) {
     data.planStart = saved.planStart;

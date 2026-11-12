@@ -441,6 +441,16 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("corrupt saved setup falls back to defaults", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.evaluate(() => localStorage.setItem("mtgTimer.setup.v1", "{}"));
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator("#totalMin")).toHaveValue("30");
+    await expect(page.locator("#planStart")).toHaveValue("10:00:00");
+    expect(await page.locator("#agendaBody tr").count()).toBe(4);
+    expect(errors).toEqual([]);
+  });
+
   test("template selection applies a preset", async ({ page }) => {
     const errors = await setupPage(page);
     await page.selectOption("#templateSelect", "short");
@@ -515,6 +525,23 @@ test.describe("MTG timer", () => {
     await page.waitForTimeout(150);
     expect(await page.evaluate(() => !!document.fullscreenElement)).toBe(true);
     expect(errors).toEqual([]);
+  });
+
+  test("service worker enables offline reload", async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => false });
+    });
+    await page.goto("/");
+    const active = await page.evaluate(async () => {
+      if (!("serviceWorker" in navigator)) return false;
+      const registration = await navigator.serviceWorker.ready;
+      return !!registration.active;
+    });
+    expect(active).toBe(true);
+    await page.context().setOffline(true);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator("#startNowBtn")).toBeVisible();
+    await page.context().setOffline(false);
   });
 
   test("PWA assets are available", async ({ page }) => {

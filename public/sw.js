@@ -38,8 +38,10 @@ self.addEventListener("fetch", (event) => {
     event.respondWith((async () => {
       try {
         const response = await fetch(event.request);
-        const cache = await caches.open(CACHE);
-        cache.put("./index.html", response.clone());
+        if (response.ok) {
+          const cache = await caches.open(CACHE);
+          cache.put("./index.html", response.clone());
+        }
         return response;
       } catch (e) {
         const cached = await caches.match("./index.html");
@@ -52,14 +54,14 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    const cached = await cache.match(event.request);
-    const network = fetch(event.request)
-      .then((response) => {
-        if (response.ok) cache.put(event.request, response.clone());
-        return response;
-      })
-      .catch(() => cached || new Response("", { status: 503 }));
-    return cached || network;
+    try {
+      const response = await fetch(event.request);
+      if (response.ok) cache.put(event.request, response.clone());
+      return response;
+    } catch (e) {
+      const cached = await cache.match(event.request);
+      return cached || new Response("", { status: 503 });
+    }
   })());
 });
 

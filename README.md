@@ -30,6 +30,7 @@ GitHub Pages: https://lamy210.github.io/timer/
 
 - `npm install`
 - `npm test`（Playwright）
+- ローカルで直接確認する場合は `python3 -m http.server 8765 --directory public` などで配信してください（ES ModulesとService Workerのため`file://`では動作しません）
 - CIではテスト成功後にGitHub Pagesへデプロイ
 
 ## デプロイ
@@ -37,4 +38,4 @@ GitHub Pages: https://lamy210.github.io/timer/
 - `.github/workflows/deploy-pages.yml` で `main` ブランチへのpush時に自動デプロイ
 - GitHub Pages の Source は「GitHub Actions」
 - PWAのService Workerでアプリ本体をキャッシュ（`public/sw.js`）
-- Service Workerのキャッシュを更新する場合は `public/sw.js` の `CACHE` を更新
+- 静的アセットはネットワーク優先で取得し、オフライン時はService Workerのキャッシュを使用

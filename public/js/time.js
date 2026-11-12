@@ -33,7 +33,7 @@ export function dayIndexJst(ms) {
 
 export function fmtClockRel(ms, refMs) {
   const diff = dayIndexJst(ms) - dayIndexJst(refMs);
-  const prefix = diff === 1 ? "翌 " : diff > 1 ? "+" + diff + "日 " : "";
+  const prefix = diff === 1 ? "翌 " : diff > 1 ? "+" + diff + "日 " : diff === -1 ? "前日 " : diff < -1 ? Math.abs(diff) + "日前 " : "";
   return prefix + fmtClock(ms);
 }
 
@@ -45,7 +45,7 @@ export function fmtDateJst(ms) {
 
 export function fmtPlanStartLabel(ms, refMs) {
   const diff = dayIndexJst(ms) - dayIndexJst(refMs);
-  const rel = diff === 0 ? "本日" : diff === 1 ? "翌日" : diff > 1 ? diff + "日後" : "";
+  const rel = diff === 0 ? "本日" : diff === 1 ? "翌日" : diff > 1 ? diff + "日後" : diff === -1 ? "前日" : diff < -1 ? Math.abs(diff) + "日前" : "";
   return rel + " " + fmtDateJst(ms) + " " + fmtClock(ms);
 }
 

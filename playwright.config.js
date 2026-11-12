@@ -11,7 +11,7 @@ export default defineConfig({
   reporter: process.env.CI ? [["github"], ["html", { open: "never" }]] : "list",
   use: {
     baseURL: "http://127.0.0.1:8765",
-    serviceWorkers: "block",
+    serviceWorkers: "allow",
     viewport: { width: 1100, height: 900 }
   },
   webServer: {
