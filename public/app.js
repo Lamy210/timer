@@ -299,7 +299,6 @@ function restoreRun() {
     R.ended = false;
     R.overrunMode = overrunMode;
     R.overrun = !!R.overrun && now >= R.meetEndMs;
-    R.overrunAnnounced = !!R.overrunAnnounced;
     R.preEndSec = clampNum(R.preEndSec, 0, 300);
     R.startPreEnabled = !!R.startPreEnabled;
     R.meetPreEnabled = !!R.meetPreEnabled;
@@ -521,11 +520,9 @@ function startRun(mode) {
     planStartMs: planStartMs,
     actStartMs: actStartMs,
     meetEndMs: meetEndMs,
-    preStartMin: preStartMin,
     preEndSec: preEndSec,
     overrunMode: overrunMode,
     overrun: false,
-    overrunAnnounced: false,
     items: built.items,
     idx: -1,
     ended: false,
@@ -683,7 +680,6 @@ function fireMeetingPreAlarm(now) {
 function enterOverrun() {
   if (R.overrun) return;
   R.overrun = true;
-  R.overrunAnnounced = true;
   if (!R.endBeepScheduled) playSequence("end");
   showBanner("終了時刻を超過", "会議を終了するには「会議を終了」を押してください", "予定の終了時刻を過ぎました。会議を継続中です。終了する場合は会議を終了を押してください。", "endj", 15000);
   speak("予定の終了時刻を過ぎました。会議を継続中です。終了する場合は会議を終了を押してください。");
@@ -1036,6 +1032,10 @@ $("importFile").addEventListener("change", async () => {
   const file = $("importFile").files && $("importFile").files[0];
   if (!file) return;
   try {
+    if (file.size > 1024 * 1024) {
+      toast("JSONファイルが大きすぎます（1MBまで）。");
+      return;
+    }
     const text = await file.text();
     const data = parseImportedSetup(text);
     if (!data) {
@@ -1062,12 +1062,13 @@ window.addEventListener("beforeinstallprompt", (event) => {
 
 $("installBtn").addEventListener("click", async () => {
   if (!deferredInstallPrompt) return;
-  deferredInstallPrompt.prompt();
-  try {
-    await deferredInstallPrompt.userChoice;
-  } catch (e) {}
+  const prompt = deferredInstallPrompt;
   deferredInstallPrompt = null;
   $("installBtn").hidden = true;
+  try {
+    prompt.prompt();
+    await prompt.userChoice;
+  } catch (e) {}
 });
 
 window.addEventListener("appinstalled", () => {
@@ -1152,7 +1153,6 @@ $("extendBtn").addEventListener("click", () => {
   if (R.overrun) {
     R.meetEndMs = Math.max(R.meetEndMs, now) + delta;
     R.overrun = false;
-    R.overrunAnnounced = false;
     R.meetPreEnabled = R.preEndSec > 0;
     R.meetPreMs = R.meetEndMs - R.preEndSec * 1000;
     R.meetPreFired = !R.meetPreEnabled || R.meetPreMs <= now;
