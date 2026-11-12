@@ -577,6 +577,17 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("oversized JSON import is rejected", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.setInputFiles("#importFile", {
+      name: "big.json",
+      mimeType: "application/json",
+      buffer: Buffer.alloc(1024 * 1024 + 1, 32)
+    });
+    await expect(page.locator("#toast")).toContainText("JSONファイルが大きすぎます");
+    expect(errors).toEqual([]);
+  });
+
   test("notification, ARIA, and fullscreen work", async ({ page }) => {
     const errors = await setupPage(page);
     await expect(page.locator("#banner")).toHaveAttribute("role", "alert");
