@@ -76,6 +76,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--ac)}
 .bar{height:14px;background:#0b0d12;border:1px solid var(--line);border-radius:7px;overflow:hidden;max-width:640px;margin:0 auto}
 #curBar{height:100%;background:linear-gradient(90deg,var(--ac2),var(--ac));width:0%}
 .ctrl{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+.ctrl label.extend{justify-content:flex-end}
 .next{margin-top:14px;font-size:14px;color:var(--sub);overflow-wrap:anywhere}
 .next b{color:var(--tx)}
 .timeline{display:flex;height:46px;border-radius:8px;overflow:hidden;margin:6px 0 16px;border:1px solid var(--line)}

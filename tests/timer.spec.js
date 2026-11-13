@@ -381,6 +381,17 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("custom extension minutes are applied", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.click("#startNowBtn");
+    await expect(page.locator("#run")).toBeVisible();
+    await page.fill("#extendMin", "10");
+    await page.click("#extendBtn");
+    await expect(page.locator("#meetEnd")).toHaveText("10:40:00");
+    await expect(page.locator("#bTitle")).toContainText("10分延長しました");
+    expect(errors).toEqual([]);
+  });
+
   test("finish ends the meeting from a running agenda", async ({ page }) => {
     const errors = await setupPage(page);
     await page.click("#startNowBtn");

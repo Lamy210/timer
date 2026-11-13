@@ -872,8 +872,8 @@ function buildSummary(run) {
     ...(run.title ? ["会議名: " + run.title] : []),
     "開始: " + fmtClockRel(run.actStartMs, now),
     "終了: " + fmtClockRel(actualEnd, now) + "（予定 " + fmtClockRel(run.meetEndMs, now) + "）",
+    "予定: " + fmtClockRel(run.planStartMs, now) + " 〜 " + fmtClockRel(run.meetEndMs, now) + "（" + fmtDur(run.meetEndMs - run.planStartMs) + "）",
     "実際の長さ: " + fmtDur(actualEnd - run.actStartMs),
-    "予定の長さ: " + fmtDur(run.meetEndMs - run.planStartMs),
     ""
   ];
   run.items.forEach((it) => {
@@ -920,7 +920,7 @@ function renderHistory() {
     const meta = document.createElement("div");
     meta.className = "historyMeta";
     const skipped = entry.items.filter((it) => it.status === "skip").length;
-    meta.textContent = "予定終了 " + fmtClockRel(entry.meetEndMs, now)
+    meta.textContent = "予定 " + fmtClockRel(entry.planStartMs, now) + " 〜 " + fmtClockRel(entry.meetEndMs, now)
       + "　／　実際 " + fmtDur(entry.actualEndMs - entry.actStartMs)
       + "　／　" + entry.items.length + "件"
       + (skipped > 0 ? "（スキップ " + skipped + "件）" : "");
@@ -1344,12 +1344,18 @@ $("finishBtn").addEventListener("click", () => {
   renderRun(Date.now());
 });
 
+$("extendMin").addEventListener("change", () => {
+  $("extendMin").value = clampNum($("extendMin").value, 1, 60);
+});
+
 $("extendBtn").addEventListener("click", () => {
   if (!R || R.ended) return;
   const now = Date.now();
   if (now < extendLockUntil) return;
   extendLockUntil = now + 500;
-  const delta = 5 * 60000;
+  const minutes = clampNum($("extendMin").value, 1, 60);
+  $("extendMin").value = minutes;
+  const delta = minutes * 60000;
 
   if (R.overrun) {
     R.meetEndMs = Math.max(R.meetEndMs, now) + delta;
@@ -1373,9 +1379,9 @@ $("extendBtn").addEventListener("click", () => {
     R.meetPreFired = !R.meetPreEnabled || R.meetPreMs <= now;
   }
 
-  showBanner("5分延長しました", "会議終了 " + fmtClockRel(R.meetEndMs, now), "5分延長しました。会議終了は" + fmtClockRel(R.meetEndMs, now) + "です。", "start", 7000);
-  speak("5分延長しました。");
-  toast("5分延長しました（会議終了 " + fmtClockRel(R.meetEndMs, now) + "）");
+  showBanner(minutes + "分延長しました", "会議終了 " + fmtClockRel(R.meetEndMs, now), minutes + "分延長しました。会議終了は" + fmtClockRel(R.meetEndMs, now) + "です。", "start", 7000);
+  speak(minutes + "分延長しました。");
+  toast(minutes + "分延長しました（会議終了 " + fmtClockRel(R.meetEndMs, now) + "）");
   persistRun();
   scheduleAlarms();
   renderRun(now);
@@ -1572,7 +1578,7 @@ document.addEventListener("keydown", (event) => {
     $("quitBtn").click();
   } else if (event.key === "?") {
     event.preventDefault();
-    showBanner("キーボードショートカット", "N: 次の議題　B: 前の議題　E: +5分延長　F: 会議を終了　M: 音声切替　Q: 設定に戻る", "", "start", 8000);
+    showBanner("キーボードショートカット", "N: 次の議題　B: 前の議題　E: 延長　F: 会議を終了　M: 音声切替　Q: 設定に戻る", "", "start", 8000);
   }
 });
 
