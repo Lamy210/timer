@@ -1,6 +1,7 @@
 import { TEMPLATES, STORAGE_HISTORY, loadSetupData, saveSetupData, loadRunData, saveRunData, clearRunData, serializeSetup, parseImportedSetup, loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistoryData, mergeHistoryEntries } from "./js/storage.js";
 import { getSoundOn, setSoundOn, isAudioUnlocked, unlockAudio, playSequence, scheduleSequence, clearScheduled, audioNow, speak, cancelSpeech, notify, requestNotificationPermission, vibrateSequence } from "./js/alerts.js";
 import { jstParts, fmtHMS, fmtClock, dayIndexJst, fmtClockRel, fmtPlanStartLabel, resolvePlanStartMs, getFixedStartInfoFromMs, dateTodToMs, fmtDur, remainSpeech, parseTime, todToMs, clampNum } from "./js/time.js";
+import { csvCell, historySummaryText, historyCsvRows } from "./js/history.js";
 const $ = (id) => document.getElementById(id);
 
 let toastTimer = null;
@@ -941,6 +942,8 @@ function renderHistory() {
   const list = $("historyList");
   if (!card || !list) return;
   const history = loadHistory();
+  const summary = $("historySummary");
+  if (summary) summary.textContent = historySummaryText(history);
   card.hidden = history.length === 0;
   list.innerHTML = "";
   const now = Date.now();
@@ -1592,32 +1595,11 @@ $("clearHistoryBtn").addEventListener("click", () => {
   toast("会議履歴を削除しました。");
 });
 
-function csvCell(value) {
-  let text = String(value == null ? "" : value);
-  if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;
-  return /[",\n\r]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
-}
-
 $("exportHistoryCsvBtn").addEventListener("click", () => {
   const history = loadHistory();
   if (history.length === 0) return;
   const now = Date.now();
-  const rows = [["会議名", "開始", "終了", "予定開始", "予定終了", "実際の長さ(分)", "議題数", "スキップ数", "議題一覧"]];
-  history.forEach((entry) => {
-    const names = entry.items.map((it) => it.name).join(" / ");
-    const skipped = entry.items.filter((it) => it.status === "skip").length;
-    rows.push([
-      entry.title || "",
-      fmtPlanStartLabel(entry.actStartMs, now),
-      fmtClockRel(entry.actualEndMs, now),
-      fmtPlanStartLabel(entry.planStartMs, now),
-      fmtClockRel(entry.meetEndMs, now),
-      (Math.max(0, entry.actualEndMs - entry.actStartMs) / 60000).toFixed(1),
-      entry.items.length,
-      skipped,
-      names
-    ]);
-  });
+  const rows = historyCsvRows(history, now, fmtPlanStartLabel, fmtClockRel);
   const csv = "\uFEFF" + rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
   const url = URL.createObjectURL(blob);

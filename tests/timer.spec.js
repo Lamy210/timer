@@ -794,6 +794,34 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("history summary reports count, average, overrun, and skips", async ({ page }) => {
+    const errors = await setupPage(page);
+    const now = Date.now();
+    const mk = (id, title, actualMin) => ({
+      id,
+      title,
+      planStartMs: now - 1200000,
+      actStartMs: now - 1200000,
+      meetEndMs: now - 600000,
+      actualEndMs: now - 1200000 + actualMin * 60000,
+      items: [
+        { name: title + "1", status: "skip", endMs: now - 900000, note: "" },
+        { name: title + "2", status: "done", endMs: now - 1200000 + actualMin * 60000, note: "" }
+      ]
+    });
+    await page.setInputFiles("#importHistoryFile", {
+      name: "history-summary.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify({ history: [mk("a", "A会議", 10), mk("b", "B会議", 12)] }))
+    });
+    await expect(page.locator("#toast")).toContainText("2件の会議履歴を読み込みました");
+    await expect(page.locator("#historySummary")).toContainText("履歴2件");
+    await expect(page.locator("#historySummary")).toContainText("平均実績 11分");
+    await expect(page.locator("#historySummary")).toContainText("平均超過 +1分");
+    await expect(page.locator("#historySummary")).toContainText("スキップ 2件");
+    expect(errors).toEqual([]);
+  });
+
   test("start works when Web Locks throws", async ({ page }) => {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, "locks", {
@@ -974,5 +1002,6 @@ test.describe("MTG timer", () => {
     expect((await page.request.get("/icons/icon-192.png")).ok()).toBe(true);
     expect((await page.request.get("/icons/icon-512.png")).ok()).toBe(true);
     expect((await page.request.get("/sw.js")).ok()).toBe(true);
+    expect((await page.request.get("/js/history.js")).ok()).toBe(true);
   });
 });
