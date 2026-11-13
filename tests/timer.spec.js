@@ -673,6 +673,34 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("keyboard shortcuts operate the timer", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.click("#startNowBtn");
+    await expect(page.locator("#run")).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.activeElement && document.activeElement.id)).toBe("curName");
+
+    await page.keyboard.press("n");
+    await expect(page.locator("#runBody tr:nth-child(1) td:nth-child(4)")).toHaveText("スキップ");
+    await expect(page.locator("#curName")).toContainText("議題1：報告");
+
+    await page.keyboard.press("b");
+    await expect(page.locator("#curName")).toContainText("挨拶・議題確認");
+
+    await page.keyboard.press("e");
+    await expect(page.locator("#meetEnd")).toHaveText("10:35:00");
+
+    await page.keyboard.press("?");
+    await expect(page.locator("#bTitle")).toContainText("キーボードショートカット");
+
+    await page.keyboard.press("f");
+    await expect(page.locator("#curName")).toHaveText("終了");
+
+    await page.keyboard.press("q");
+    await expect(page.locator("#setup")).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.activeElement && document.activeElement.id)).toBe("startNowBtn");
+    expect(errors).toEqual([]);
+  });
+
   test("focus moves for agenda controls and screen transitions", async ({ page }) => {
     const errors = await setupPage(page);
     await page.locator("#agendaBody tr:nth-child(1) td:nth-child(5) button[title=\"下へ移動\"]").click();

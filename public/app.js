@@ -274,7 +274,9 @@ let tickTimer = null;
 let bannerTimer = null;
 let lastRenderKey = "";
 let runRowRefs = [];
-let actionLockUntil = 0;
+let skipLockUntil = 0;
+let backLockUntil = 0;
+let extendLockUntil = 0;
 let saveSetupTimer = null;
 let runLockRelease = null;
 
@@ -387,7 +389,9 @@ async function restoreRun() {
       it.preBeepScheduled = false;
       it.endBeepScheduled = false;
     });
-    actionLockUntil = 0;
+    skipLockUntil = 0;
+    backLockUntil = 0;
+    extendLockUntil = 0;
     lastRenderKey = "";
     $("setup").hidden = true;
     $("run").hidden = false;
@@ -635,7 +639,9 @@ async function startRun(mode) {
     endBeepScheduled: false
   };
   advanceToNext(actStartMs);
-  actionLockUntil = 0;
+  skipLockUntil = 0;
+  backLockUntil = 0;
+  extendLockUntil = 0;
   lastRenderKey = "";
 
   if (tickTimer) {
@@ -1316,7 +1322,7 @@ $("startFixedBtn").addEventListener("click", () => startRun("fixed"));
 $("startPlanBtn").addEventListener("click", () => startRun("plan"));
 
 $("finishBtn").addEventListener("click", () => {
-  if (!R || R.ended) return;
+  if (!R || R.ended || $("finishBtn").hidden) return;
   if (!window.confirm("会議を終了しますか？")) return;
   endMeeting(true);
   renderRun(Date.now());
@@ -1325,8 +1331,8 @@ $("finishBtn").addEventListener("click", () => {
 $("extendBtn").addEventListener("click", () => {
   if (!R || R.ended) return;
   const now = Date.now();
-  if (now < actionLockUntil) return;
-  actionLockUntil = now + 500;
+  if (now < extendLockUntil) return;
+  extendLockUntil = now + 500;
   const delta = 5 * 60000;
 
   if (R.overrun) {
@@ -1362,8 +1368,8 @@ $("extendBtn").addEventListener("click", () => {
 $("skipBtn").addEventListener("click", () => {
   if (!R || R.idx < 0 || R.ended || R.overrun) return;
   const now = Date.now();
-  if (now < actionLockUntil) return;
-  actionLockUntil = now + 500;
+  if (now < skipLockUntil) return;
+  skipLockUntil = now + 500;
   enableAudio();
   const cur = R.items[R.idx];
   cur.status = "skip";
@@ -1387,8 +1393,8 @@ $("skipBtn").addEventListener("click", () => {
 $("backBtn").addEventListener("click", () => {
   if (!R || R.ended || R.overrun) return;
   const now = Date.now();
-  if (now < actionLockUntil) return;
-  actionLockUntil = now + 500;
+  if (now < backLockUntil) return;
+  backLockUntil = now + 500;
   let j = -1;
   if (R.idx >= 0) {
     for (let i = R.idx - 1; i >= 0; i--) {
@@ -1486,7 +1492,9 @@ $("quitBtn").addEventListener("click", () => {
   } catch (e) {}
   releaseWakeLock();
   clearScheduled();
-  actionLockUntil = 0;
+  skipLockUntil = 0;
+  backLockUntil = 0;
+  extendLockUntil = 0;
   if (document.fullscreenElement) {
     document.exitFullscreen().catch(() => {});
   }
@@ -1499,6 +1507,36 @@ $("quitBtn").addEventListener("click", () => {
   saveSetup();
   updateCalc();
   $("startNowBtn").focus();
+});
+
+document.addEventListener("keydown", (event) => {
+  if ($("run").hidden) return;
+  if (event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;
+  const tag = event.target && event.target.tagName;
+  if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+  const key = event.key.toLowerCase();
+  if (key === "n") {
+    event.preventDefault();
+    if (!$("skipBtn").hidden) $("skipBtn").click();
+  } else if (key === "b") {
+    event.preventDefault();
+    if (!$("backBtn").hidden) $("backBtn").click();
+  } else if (key === "e") {
+    event.preventDefault();
+    if (!$("extendBtn").hidden) $("extendBtn").click();
+  } else if (key === "f") {
+    event.preventDefault();
+    if (!$("finishBtn").hidden) $("finishBtn").click();
+  } else if (key === "m") {
+    event.preventDefault();
+    $("soundBtn").click();
+  } else if (key === "q") {
+    event.preventDefault();
+    $("quitBtn").click();
+  } else if (event.key === "?") {
+    event.preventDefault();
+    showBanner("キーボードショートカット", "N: 次の議題　B: 前の議題　E: +5分延長　F: 会議を終了　M: 音声切替　Q: 設定に戻る", "", "start", 8000);
+  }
 });
 
 document.addEventListener("visibilitychange", () => {
