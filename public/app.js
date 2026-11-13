@@ -797,7 +797,14 @@ function enterOverrun() {
   vibrateSequence("end");
   showBanner("終了時刻を超過", "会議を終了するには「会議を終了」を押してください", "予定の終了時刻を過ぎました。会議を継続中です。終了する場合は会議を終了を押してください。", "endj", 15000);
   speak("予定の終了時刻を過ぎました。会議を継続中です。終了する場合は会議を終了を押してください。");
-  notify("終了時刻を超過", "会議を終了するには「会議を終了」を押してください。");
+  notify("終了時刻を超過", "会議を終了するには「会議を終了」を押してください。", {
+    tag: "mtg-timer-overrun",
+    requireInteraction: true,
+    actions: [
+      { action: "extend5", title: "5分延長" },
+      { action: "finish", title: "会議を終了" }
+    ]
+  });
   persistRun();
 }
 
@@ -1417,6 +1424,25 @@ $("copyBtn").addEventListener("click", async () => {
     toast("コピーできませんでした。");
   }
 });
+
+function handleNotificationAction(action) {
+  if (!R || R.ended) return;
+  if (action === "extend5") {
+    $("extendMin").value = "5";
+    $("extendBtn").click();
+  } else if (action === "finish") {
+    endMeeting(true);
+    renderRun(Date.now());
+  }
+}
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    const data = event.data;
+    if (!data || data.type !== "notification-action") return;
+    handleNotificationAction(data.action);
+  });
+}
 
 $("quitBtn").addEventListener("click", () => {
   if (R && !R.ended && !window.confirm("タイマーを終了して設定に戻りますか？")) return;

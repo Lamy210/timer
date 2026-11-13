@@ -69,9 +69,15 @@ self.addEventListener("fetch", (event) => {
 });
 
 self.addEventListener("notificationclick", (event) => {
+  const action = event.action;
   event.notification.close();
   event.waitUntil((async () => {
     const windows = await clients.matchAll({ type: "window", includeUncontrolled: true });
+    if (action === "extend5" || action === "finish") {
+      for (const client of windows) {
+        client.postMessage({ type: "notification-action", action: action });
+      }
+    }
     for (const client of windows) {
       if ("focus" in client) return client.focus();
     }

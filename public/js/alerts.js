@@ -167,7 +167,7 @@ export async function requestNotificationPermission() {
   }
 }
 
-export async function notify(title, body) {
+export async function notify(title, body, extra = {}) {
   try {
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     if (document.visibilityState === "visible") return;
@@ -175,7 +175,8 @@ export async function notify(title, body) {
       body: body,
       tag: "mtg-timer",
       renotify: true,
-      icon: "./icons/icon-192.png"
+      icon: "./icons/icon-192.png",
+      ...extra
     };
     if ("serviceWorker" in navigator) {
       const reg = await navigator.serviceWorker.getRegistration();

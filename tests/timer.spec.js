@@ -975,6 +975,40 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("notification actions extend and finish the run", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.click("#notifyBtn");
+    await page.waitForTimeout(50);
+    await page.fill("#totalMin", "1");
+    await makeSingleAgenda(page, "通知議題", 0, 10);
+    await page.evaluate(() => { window.__forceHidden = true; });
+    await page.click("#startNowBtn");
+    await expect(page.locator("#run")).toBeVisible();
+    await page.clock.fastForward(61000);
+    await expect(page.locator("#curName")).toHaveText("超過中");
+
+    const notifications = await page.evaluate(() => window.__notifications);
+    const overrun = notifications.find((n) => n.title === "終了時刻を超過");
+    expect(overrun).toBeTruthy();
+    expect(overrun.options.actions.map((a) => a.action)).toEqual(["extend5", "finish"]);
+
+    await page.evaluate(() => {
+      navigator.serviceWorker.dispatchEvent(new MessageEvent("message", {
+        data: { type: "notification-action", action: "extend5" }
+      }));
+    });
+    await expect(page.locator("#curName")).not.toHaveText("超過中");
+    await expect(page.locator("#meetEnd")).toHaveText(/10:06:0[01]/);
+
+    await page.evaluate(() => {
+      navigator.serviceWorker.dispatchEvent(new MessageEvent("message", {
+        data: { type: "notification-action", action: "finish" }
+      }));
+    });
+    await expect(page.locator("#curName")).toHaveText("終了");
+    expect(errors).toEqual([]);
+  });
+
   test("service worker enables offline reload", async ({ page }) => {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, "webdriver", { get: () => false });
