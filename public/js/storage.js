@@ -51,7 +51,7 @@ function normalizeRows(rows) {
 export function normalizeSetupData(saved) {
   if (!saved || typeof saved !== "object") return null;
   const hasRows = Array.isArray(saved.rows) && saved.rows.length > 0;
-  if (saved.planStart == null && saved.planDate == null && saved.totalMin == null && saved.preStartMin == null && saved.preEndSec == null && !hasRows) {
+  if (saved.planStart == null && saved.planDate == null && saved.totalMin == null && saved.preStartMin == null && saved.preEndSec == null && typeof saved.overrunMode !== "boolean" && !hasRows) {
     return null;
   }
   const data = {};

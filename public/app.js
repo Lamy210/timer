@@ -938,8 +938,12 @@ function renderHistory() {
     del.className = "mini";
     del.textContent = "削除";
     del.addEventListener("click", () => {
+      if (!window.confirm("この会議履歴を削除しますか？")) return;
       deleteHistoryEntry(entry.id);
       renderHistory();
+      const next = document.querySelector("#historyList .historyOps button:last-child");
+      if (next && !next.disabled) next.focus();
+      else $("startNowBtn").focus();
     });
     ops.appendChild(copy);
     ops.appendChild(del);
@@ -1471,7 +1475,28 @@ $("clearHistoryBtn").addEventListener("click", () => {
   if (!window.confirm("会議履歴をすべて削除しますか？")) return;
   clearHistoryData();
   renderHistory();
+  $("startNowBtn").focus();
   toast("会議履歴を削除しました。");
+});
+
+$("exportHistoryBtn").addEventListener("click", () => {
+  const history = loadHistory();
+  if (history.length === 0) return;
+  const blob = new Blob([JSON.stringify({
+    app: "mtg-timer",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    history: history
+  }, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "mtg-timer-history.json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast("会議履歴をJSONで書き出しました。");
 });
 
 window.addEventListener("storage", (event) => {

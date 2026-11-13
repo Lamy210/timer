@@ -564,8 +564,16 @@ test.describe("MTG timer", () => {
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.locator("#historyCard")).toBeVisible();
 
+    const downloadPromise = page.waitForEvent("download");
+    await page.click("#exportHistoryBtn");
+    const download = await downloadPromise;
+    const path = await download.path();
+    const data = JSON.parse(fs.readFileSync(path, "utf8"));
+    expect(data.history[0].items[0].name).toContain("挨拶");
+
     await page.locator("#historyList button").filter({ hasText: "削除" }).click();
     await expect(page.locator("#historyCard")).toBeHidden();
+    await expect.poll(() => page.evaluate(() => document.activeElement && document.activeElement.id)).toBe("startNowBtn");
     expect(errors).toEqual([]);
   });
 
@@ -659,6 +667,19 @@ test.describe("MTG timer", () => {
     });
     await expect(page.locator("#toast")).toContainText("設定を読み込みました");
     await expect(page.locator("#planDate")).toHaveValue("");
+    expect(errors).toEqual([]);
+  });
+
+  test("JSON import can update only the overrun setting", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.uncheck("#overrunMode");
+    await page.setInputFiles("#importFile", {
+      name: "overrun.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify({ overrunMode: true }))
+    });
+    await expect(page.locator("#toast")).toContainText("設定を読み込みました");
+    await expect(page.locator("#overrunMode")).toBeChecked();
     expect(errors).toEqual([]);
   });
 

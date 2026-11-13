@@ -44,7 +44,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #warn{color:var(--red);font-size:13px}
 .startbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
 .starthelp{margin:10px 0 0}
-.historyHead{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.historyHead{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
 .historyHead h2{font-size:16px;margin:0;flex:1}
 .historyItem{display:flex;gap:12px;align-items:flex-start;border-top:1px solid var(--line);padding:10px 0}
 .historyItem:first-child{border-top:0;padding-top:0}
