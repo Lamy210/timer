@@ -46,7 +46,8 @@ GitHub Pages: https://lamy210.github.io/timer/
 
 ## 構成
 
-- `public/app.js`: 起動・実行制御・キーボード・PWA連携
+- `public/app.js`: 起動・PWA・通知・設定/履歴の配線
+- `public/js/run.js`: 実行制御・アラーム・キーボード・実行画面イベント
 - `public/js/setup.js`: 設定フォーム・議題・テンプレート・設定JSON
 - `public/js/run-state.js`: 実行状態の更新（開始・復元・延長・スキップ・戻る）
 - `public/js/run-view.js`: 実行画面の描画

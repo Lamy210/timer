@@ -1,4 +1,4 @@
-const CACHE = "mtg-timer-v5";
+const CACHE = "mtg-timer-v6";
 const ASSETS = [
   "./",
   "./index.html",
@@ -13,6 +13,7 @@ const ASSETS = [
   "./js/setup.js",
   "./js/run-view.js",
   "./js/run-state.js",
+  "./js/run.js",
   "./manifest.json",
   "./icons/icon.svg",
   "./icons/icon-192.png",
