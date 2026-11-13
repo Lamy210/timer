@@ -595,6 +595,17 @@ test.describe("MTG timer", () => {
     await expect(page.locator("#historyList")).toContainText("定例会");
     await expect(page.locator("#historyList")).toContainText("挨拶・議題確認");
 
+    const detailToggle = page.locator("#historyList button").filter({ hasText: "詳細" }).first();
+    await detailToggle.click();
+    const historyDetail = page.locator("#historyList .historyDetail").first();
+    await expect(historyDetail).toBeVisible();
+    await expect(historyDetail).toContainText("挨拶・議題確認");
+    await expect(historyDetail).toContainText("完了");
+    await expect(detailToggle).toHaveAttribute("aria-expanded", "true");
+    await detailToggle.click();
+    await expect(historyDetail).toBeHidden();
+    await expect(detailToggle).toHaveAttribute("aria-expanded", "false");
+
     await page.locator("#historyList button").filter({ hasText: "コピー" }).click();
     await page.waitForTimeout(50);
     const copied = await page.evaluate(() => window.__copiedText || "");

@@ -3,6 +3,13 @@ import { fmtClockRel, fmtPlanStartLabel, fmtDur } from "./time.js";
 import { STORAGE_HISTORY, loadHistory, deleteHistoryEntry, clearHistoryData, mergeHistoryEntries } from "./storage.js";
 import { buildSummary } from "./result.js";
 
+const HISTORY_STATUS = {
+  done: "完了",
+  skip: "スキップ",
+  run: "実行中",
+  wait: "待機"
+};
+
 let applyTemplate = null;
 
 export function csvCell(value) {
@@ -172,8 +179,39 @@ export function renderHistory() {
     main.appendChild(title);
     main.appendChild(meta);
     if (entry.title && agenda.textContent) main.appendChild(agenda);
+    const detail = document.createElement("div");
+    detail.className = "historyDetail";
+    detail.id = "historyDetail-" + index;
+    detail.hidden = true;
+    const detailSummary = document.createElement("div");
+    detailSummary.textContent = "予定 " + fmtClockRel(entry.planStartMs, now) + " 〜 " + fmtClockRel(entry.meetEndMs, now)
+      + "　／　実績 " + fmtClockRel(entry.actStartMs, now) + " 〜 " + fmtClockRel(entry.actualEndMs, now);
+    detail.appendChild(detailSummary);
+    const detailList = document.createElement("ul");
+    entry.items.forEach((it) => {
+      const li = document.createElement("li");
+      const name = document.createElement("b");
+      name.textContent = it.name || "（無題の議題）";
+      li.appendChild(name);
+      li.appendChild(document.createTextNode("　終了 " + fmtClockRel(it.endMs, now)
+        + "　" + (HISTORY_STATUS[it.status] || it.status)
+        + (it.note ? "　" + it.note : "")));
+      detailList.appendChild(li);
+    });
+    detail.appendChild(detailList);
+
     const ops = document.createElement("div");
     ops.className = "historyOps";
+    const detailBtn = document.createElement("button");
+    detailBtn.type = "button";
+    detailBtn.className = "mini";
+    detailBtn.textContent = "詳細";
+    detailBtn.setAttribute("aria-expanded", "false");
+    detailBtn.setAttribute("aria-controls", detail.id);
+    detailBtn.addEventListener("click", () => {
+      detail.hidden = !detail.hidden;
+      detailBtn.setAttribute("aria-expanded", String(!detail.hidden));
+    });
     const copy = document.createElement("button");
     copy.type = "button";
     copy.className = "mini";
@@ -208,11 +246,13 @@ export function renderHistory() {
       if (target) target.focus();
       else $("startNowBtn").focus();
     });
+    ops.appendChild(detailBtn);
     ops.appendChild(copy);
     ops.appendChild(reuse);
     ops.appendChild(del);
     item.appendChild(main);
     item.appendChild(ops);
+    item.appendChild(detail);
     list.appendChild(item);
   });
 }
