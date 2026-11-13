@@ -113,12 +113,12 @@ function normalizeHistoryEntry(entry) {
   if (typeof entry.id !== "string" || !entry.id) return null;
   if (!Number.isFinite(entry.planStartMs) || !Number.isFinite(entry.actStartMs)
     || !Number.isFinite(entry.meetEndMs) || !Number.isFinite(entry.actualEndMs)
-    || !Array.isArray(entry.items)) return null;
+    || !Array.isArray(entry.items) || entry.items.length === 0) return null;
   const items = entry.items.slice(0, 100).map((it) => ({
     name: String(it && it.name || "").slice(0, 200),
     status: ["done", "skip", "run", "wait"].includes(it && it.status) ? it.status : "done",
     endMs: Number.isFinite(it && it.endMs) ? it.endMs : entry.actualEndMs,
-    note: String(it && it.note || "")
+    note: String(it && it.note || "").slice(0, 500)
   }));
   return {
     id: entry.id,

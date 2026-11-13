@@ -748,6 +748,91 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("history CSV protects against formula injection", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#meetingTitle", '=1+1,"x"');
+    await page.click("#startNowBtn");
+    await expect(page.locator("#run")).toBeVisible();
+    await page.click("#finishBtn");
+    await expect(page.locator("#curName")).toHaveText("終了");
+    await page.click("#quitBtn");
+    await expect(page.locator("#historyCard")).toBeVisible();
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.click("#exportHistoryCsvBtn");
+    const download = await downloadPromise;
+    const csv = fs.readFileSync(await download.path(), "utf8");
+    expect(csv).toContain("\"'=1+1,\"\"x\"\"\"");
+    expect(csv.split("\n")[1].startsWith("\"'=1+1")).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test("history import rejects empty agendas and caps notes", async ({ page }) => {
+    const errors = await setupPage(page);
+    const now = Date.now();
+    const base = {
+      planStartMs: now - 600000,
+      actStartMs: now - 600000,
+      meetEndMs: now - 300000,
+      actualEndMs: now - 300000
+    };
+    await page.setInputFiles("#importHistoryFile", {
+      name: "history-validation.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify({
+        history: [
+          { id: "empty", title: "空", ...base, items: [] },
+          { id: "long", title: "長文", ...base, items: [{ name: "議題", status: "done", endMs: now - 300000, note: "x".repeat(1000) }] }
+        ]
+      }))
+    });
+    await expect(page.locator("#toast")).toContainText("1件の会議履歴を読み込みました");
+    await expect(page.locator("#historyCard")).toBeVisible();
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("mtgTimer.history.v1")));
+    expect(stored.map((entry) => entry.title)).toEqual(["長文"]);
+    expect(stored[0].items[0].note.length).toBe(500);
+    expect(errors).toEqual([]);
+  });
+
+  test("start works when Web Locks throws", async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "locks", {
+        configurable: true,
+        value: { request() { throw new Error("locks unavailable"); } }
+      });
+    });
+    const errors = await setupPage(page);
+    await page.click("#startNowBtn");
+    await expect(page.locator("#run")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test("history delete focus moves to the next entry", async ({ page }) => {
+    const errors = await setupPage(page);
+    const now = Date.now();
+    const mk = (id, title) => ({
+      id,
+      title,
+      planStartMs: now - 600000,
+      actStartMs: now - 600000,
+      meetEndMs: now - 300000,
+      actualEndMs: now - 300000,
+      items: [{ name: "A", status: "done", endMs: now - 300000, note: "" }]
+    });
+    await page.setInputFiles("#importHistoryFile", {
+      name: "two-history.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify({ history: [mk("a", "A会議"), mk("b", "B会議")] }))
+    });
+    await expect(page.locator("#historyList .historyItem")).toHaveCount(2);
+
+    await page.locator("#historyList .historyOps button:last-child").first().click();
+    await expect(page.locator("#historyList .historyItem")).toHaveCount(1);
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.textContent)).toBe("削除");
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.closest(".historyItem") && document.activeElement.closest(".historyItem").textContent)).toContain("B会議");
+    expect(errors).toEqual([]);
+  });
+
   test("empty history import reports no new entries", async ({ page }) => {
     const errors = await setupPage(page);
     await page.setInputFiles("#importHistoryFile", {

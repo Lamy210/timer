@@ -283,16 +283,20 @@ let runLockRelease = null;
 function acquireRunLock() {
   if (!("locks" in navigator)) return Promise.resolve(true);
   return new Promise((resolve) => {
-    navigator.locks.request("mtg-timer-active-run", { ifAvailable: true }, (lock) => {
-      if (!lock) {
-        resolve(false);
-        return;
-      }
+    try {
+      navigator.locks.request("mtg-timer-active-run", { ifAvailable: true }, (lock) => {
+        if (!lock) {
+          resolve(false);
+          return;
+        }
+        resolve(true);
+        return new Promise((release) => {
+          runLockRelease = release;
+        });
+      }).catch(() => resolve(true));
+    } catch (e) {
       resolve(true);
-      return new Promise((release) => {
-        runLockRelease = release;
-      });
-    }).catch(() => resolve(true));
+    }
   });
 }
 
@@ -908,6 +912,10 @@ function recordHistory() {
 }
 
 function applyHistoryTemplate(entry) {
+  if (!entry || !Array.isArray(entry.items) || entry.items.length === 0) {
+    toast("再利用できる議題がありません。");
+    return;
+  }
   const nextRows = [];
   let prev = entry.planStartMs;
   entry.items.forEach((it) => {
@@ -915,6 +923,10 @@ function applyHistoryTemplate(entry) {
     prev = it.endMs;
     nextRows.push({ name: it.name, min: Math.floor(sec / 60), sec: sec % 60 });
   });
+  if (!nextRows.some((row) => row.min > 0 || row.sec > 0)) {
+    toast("再利用できる議題がありません。");
+    return;
+  }
   const total = Math.max(1, Math.min(480, Math.ceil((entry.meetEndMs - entry.planStartMs) / 60000)));
   $("meetingTitle").value = entry.title || "";
   $("totalMin").value = String(total);
@@ -932,7 +944,7 @@ function renderHistory() {
   card.hidden = history.length === 0;
   list.innerHTML = "";
   const now = Date.now();
-  history.forEach((entry) => {
+  history.forEach((entry, index) => {
     const item = document.createElement("div");
     item.className = "historyItem";
     const main = document.createElement("div");
@@ -989,8 +1001,9 @@ function renderHistory() {
       if (!window.confirm("この会議履歴を削除しますか？")) return;
       deleteHistoryEntry(entry.id);
       renderHistory();
-      const next = document.querySelector("#historyList .historyOps button:last-child");
-      if (next && !next.disabled) next.focus();
+      const buttons = document.querySelectorAll("#historyList .historyOps button:last-child");
+      const target = buttons[Math.min(index, buttons.length - 1)];
+      if (target) target.focus();
       else $("startNowBtn").focus();
     });
     ops.appendChild(copy);
@@ -1580,7 +1593,8 @@ $("clearHistoryBtn").addEventListener("click", () => {
 });
 
 function csvCell(value) {
-  const text = String(value == null ? "" : value);
+  let text = String(value == null ? "" : value);
+  if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;
   return /[",\n\r]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
 }
 
