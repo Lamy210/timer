@@ -44,6 +44,14 @@ GitHub Pages: https://lamy210.github.io/timer/
 - ローカルで直接確認する場合は `python3 -m http.server 8765 --directory public` などで配信してください（ES ModulesとService Workerのため`file://`では動作しません）
 - CIではテスト成功後にGitHub Pagesへデプロイ
 
+## 構成
+
+- `public/app.js`: 起動・実行制御・キーボード・PWA連携
+- `public/js/setup.js`: 設定フォーム・議題・テンプレート・設定JSON
+- `public/js/run-view.js`: 実行画面の描画
+- `public/js/history.js`: 会議履歴・CSV/JSON入出力
+- `public/js/ui.js` / `result.js` / `time.js` / `alerts.js` / `storage.js`: 共通処理
+
 ## デプロイ
 
 - `.github/workflows/deploy-pages.yml` で `main` ブランチへのpush時に自動デプロイ

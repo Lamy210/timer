@@ -1,22 +1,11 @@
-import { TEMPLATES, loadSetupData, saveSetupData, loadRunData, saveRunData, clearRunData, serializeSetup, parseImportedSetup, saveHistoryEntry } from "./js/storage.js";
+import { loadRunData, saveRunData, clearRunData, saveHistoryEntry } from "./js/storage.js";
 import { getSoundOn, setSoundOn, isAudioUnlocked, unlockAudio, playSequence, scheduleSequence, clearScheduled, audioNow, speak, cancelSpeech, notify, requestNotificationPermission, vibrateSequence } from "./js/alerts.js";
-import { jstParts, fmtHMS, fmtClock, dayIndexJst, fmtClockRel, fmtPlanStartLabel, resolvePlanStartMs, getFixedStartInfoFromMs, dateTodToMs, fmtDur, remainSpeech, parseTime, todToMs, clampNum } from "./js/time.js";
+import { jstParts, fmtHMS, fmtClock, dayIndexJst, fmtClockRel, fmtPlanStartLabel, resolvePlanStartMs, getFixedStartInfoFromMs, dateTodToMs, fmtDur, remainSpeech, parseTime, clampNum } from "./js/time.js";
 import { $, toast, copyText } from "./js/ui.js";
-import { ST, buildSummary } from "./js/result.js";
+import { buildSummary } from "./js/result.js";
 import { initHistory, renderHistory } from "./js/history.js";
-
-function updateSoundButton() {
-  const btn = $("soundBtn");
-  if (!btn) return;
-  const on = getSoundOn();
-  if (!isAudioUnlocked()) {
-    btn.textContent = "音声を有効化";
-    btn.setAttribute("aria-pressed", on ? "true" : "false");
-    return;
-  }
-  btn.textContent = on ? "音声あり" : "音声なし";
-  btn.setAttribute("aria-pressed", on ? "true" : "false");
-}
+import { initSetup, getRows, rowDur, saveSetup, updateCalc, setupClockTick, applyHistoryTemplate } from "./js/setup.js";
+import { renderRun, resetRunView, updateSoundButton } from "./js/run-view.js";
 
 function updateNotifyButton() {
   const btn = $("notifyBtn");
@@ -57,220 +46,12 @@ function releaseWakeLock() {
   } catch (e) {}
 }
 
-const rows = [
-  { name: "挨拶・議題確認", min: 1, sec: 0 },
-  { name: "議題1：報告", min: 9, sec: 0 },
-  { name: "議題2：討議", min: 15, sec: 0 },
-  { name: "まとめ・次回予定", min: 5, sec: 0 }
-];
-const rowRefs = [];
-
-function rowDur(r) {
-  return Math.max(0, Number(r.min) || 0) * 60 + Math.max(0, Number(r.sec) || 0);
-}
-
-function numInput(obj, key, min, max) {
-  const inp = document.createElement("input");
-  inp.type = "number";
-  inp.min = min;
-  inp.max = max;
-  inp.value = obj[key];
-  inp.style.width = "72px";
-  inp.addEventListener("input", () => {
-    const v = Number(inp.value);
-    obj[key] = Number.isFinite(v) ? Math.max(min, Math.min(max, v)) : min;
-    updateCalc();
-  });
-  inp.addEventListener("change", () => {
-    inp.value = obj[key];
-    updateCalc();
-  });
-  return inp;
-}
-
-function focusAgendaArrow(index, title) {
-  const row = document.querySelector(`#agendaBody tr:nth-child(${index + 1})`);
-  if (!row) return;
-  const btn = row.querySelector(`td.op button[title="${title}"]`);
-  if (btn && !btn.disabled) {
-    btn.focus();
-    return;
-  }
-  const other = row.querySelector('td.op button[title="上へ移動"], td.op button[title="下へ移動"]');
-  if (other && !other.disabled) {
-    other.focus();
-    return;
-  }
-  const name = row.querySelector("input.nm");
-  if (name) name.focus();
-}
-
-function focusAgendaDelete(index) {
-  const row = document.querySelector(`#agendaBody tr:nth-child(${index + 1})`);
-  if (row) {
-    const btn = row.querySelector("td.op button:last-child");
-    if (btn && !btn.disabled) {
-      btn.focus();
-      return;
-    }
-  }
-  $("addItem").focus();
-}
-
-function renderRows() {
-  const body = $("agendaBody");
-  body.innerHTML = "";
-  rowRefs.length = 0;
-  rows.forEach((r, i) => {
-    const tr = document.createElement("tr");
-    const tdN = document.createElement("td");
-    const inp = document.createElement("input");
-    inp.className = "nm";
-    inp.type = "text";
-    inp.maxLength = 200;
-    inp.value = r.name;
-    inp.placeholder = "議題" + (i + 1);
-    inp.setAttribute("aria-label", "議題" + (i + 1) + "の名前");
-    inp.addEventListener("input", () => {
-      rows[i].name = inp.value;
-      scheduleSaveSetup();
-    });
-    tdN.appendChild(inp);
-
-    const tdM = document.createElement("td");
-    tdM.appendChild(numInput(r, "min", 0, 600));
-    const tdS = document.createElement("td");
-    tdS.appendChild(numInput(r, "sec", 0, 59));
-
-    const tdE = document.createElement("td");
-    tdE.className = "endc";
-
-    const tdO = document.createElement("td");
-    tdO.className = "op";
-    const up = document.createElement("button");
-    up.className = "mini";
-    up.type = "button";
-    up.textContent = "↑";
-    up.title = "上へ移動";
-    up.setAttribute("aria-label", "上へ移動");
-    up.disabled = i === 0;
-    up.addEventListener("click", () => {
-      if (i === 0) return;
-      const tmp = rows[i - 1];
-      rows[i - 1] = rows[i];
-      rows[i] = tmp;
-      renderRows();
-      focusAgendaArrow(i - 1, "上へ移動");
-    });
-    const down = document.createElement("button");
-    down.className = "mini";
-    down.type = "button";
-    down.textContent = "↓";
-    down.title = "下へ移動";
-    down.setAttribute("aria-label", "下へ移動");
-    down.disabled = i === rows.length - 1;
-    down.addEventListener("click", () => {
-      if (i === rows.length - 1) return;
-      const tmp = rows[i + 1];
-      rows[i + 1] = rows[i];
-      rows[i] = tmp;
-      renderRows();
-      focusAgendaArrow(i + 1, "下へ移動");
-    });
-    const del = document.createElement("button");
-    del.className = "mini";
-    del.textContent = "削除";
-    del.type = "button";
-    del.disabled = rows.length <= 1;
-    del.addEventListener("click", () => {
-      rows.splice(i, 1);
-      renderRows();
-      focusAgendaDelete(Math.min(i, rows.length - 1));
-    });
-    tdO.appendChild(up);
-    tdO.appendChild(down);
-    tdO.appendChild(del);
-
-    tr.appendChild(tdN);
-    tr.appendChild(tdM);
-    tr.appendChild(tdS);
-    tr.appendChild(tdE);
-    tr.appendChild(tdO);
-    body.appendChild(tr);
-    rowRefs.push({ end: tdE });
-  });
-  updateCalc();
-}
-
-function computePlanStartMs(ps, total, now) {
-  if (ps == null) return null;
-  const date = $("planDate").value;
-  if (date) return dateTodToMs(date, ps);
-  return total > 0 ? resolvePlanStartMs(ps, total, now) : todToMs(ps, now);
-}
-
-function updateCalc(skipSave) {
-  const ps = parseTime($("planStart").value);
-  const totalMin = clampNum($("totalMin").value, 0, 480);
-  const total = totalMin * 60;
-  const now = Date.now();
-  const planStartMs = computePlanStartMs(ps, total, now);
-  let cum = 0;
-  rows.forEach((r, i) => {
-    cum += rowDur(r);
-    if (rowRefs[i]) {
-      rowRefs[i].end.textContent = planStartMs == null ? "—" : fmtClockRel(planStartMs + cum * 1000, now);
-    }
-  });
-  $("sumDisp").textContent = fmtDur(cum * 1000);
-  $("restDisp").textContent = fmtDur(Math.max(0, total - cum) * 1000);
-  $("planEndDisp").textContent = planStartMs == null ? "--:--:--" : fmtClockRel(planStartMs + total * 1000, now);
-
-  refreshPlanDate();
-
-  $("nowEndDisp").textContent = total > 0
-    ? "今すぐ開始（再計算）：終了 " + fmtClockRel(now + total * 1000, now)
-    : "今すぐ開始（再計算）：終了 --";
-  const fixed = getFixedStartInfoFromMs(planStartMs, total, now);
-  const planDate = $("planDate").value;
-  $("startFixedBtn").disabled = !fixed;
-  $("startFixedBtn").title = fixed
-    ? "予定終了時刻を維持して今すぐ開始します"
-    : planDate && planStartMs == null
-      ? "開催日が不正です。日付を確認してください。"
-      : "予定が2時間以上先か、会議が終了済みです。「今すぐ開始（再計算）」または「開始時刻まで待機」を使ってください。";
-
-  let msg = "";
-  if (ps == null) msg = "MTG開始時刻を入力してください。";
-  else if (planDate && planStartMs == null) msg = "開催日を確認してください。";
-  else if (total <= 0) msg = "会議の長さを入力してください。";
-  else if (cum > total) msg = "割り振りが会議の長さを " + fmtDur((cum - total) * 1000) + " 超えています。";
-  $("warn").textContent = msg;
-
-  const preStart = clampNum($("preStartMin").value, 0, 60);
-  const preEnd = clampNum($("preEndSec").value, 0, 300);
-  const parts = [];
-  if (planStartMs != null && preStart > 0) {
-    const preMs = planStartMs - preStart * 60000;
-    parts.push("開始前アラーム " + fmtClockRel(preMs, now) + (preMs <= now ? "（時間切れ）" : ""));
-  } else {
-    parts.push("開始前アラーム オフ");
-  }
-  if (preEnd > 0) parts.push("各議題の終了 " + preEnd + " 秒前に終了前アラーム");
-  else parts.push("終了前アラーム オフ");
-  $("alarmPreview").textContent = parts.join("　／　");
-  if (!skipSave) scheduleSaveSetup();
-}
-
 let R = null;
 let tickTimer = null;
 let bannerTimer = null;
-let lastRenderKey = "";
-let runRowRefs = [];
 let skipLockUntil = 0;
 let backLockUntil = 0;
 let extendLockUntil = 0;
-let saveSetupTimer = null;
 let runLockRelease = null;
 
 function acquireRunLock() {
@@ -298,50 +79,6 @@ function releaseRunLock() {
     try { runLockRelease(); } catch (e) {}
     runLockRelease = null;
   }
-}
-
-function collectSetupData() {
-  return {
-    planStart: $("planStart").value,
-    planDate: $("planDate").value,
-    meetingTitle: $("meetingTitle").value.trim().slice(0, 100),
-    totalMin: clampNum($("totalMin").value, 1, 480),
-    preStartMin: clampNum($("preStartMin").value, 0, 60),
-    preEndSec: clampNum($("preEndSec").value, 0, 300),
-    overrunMode: $("overrunMode").checked,
-    rows: rows.map((r) => ({ name: r.name, min: r.min, sec: r.sec }))
-  };
-}
-
-function saveSetup() {
-  saveSetupData(collectSetupData());
-}
-
-function scheduleSaveSetup() {
-  if (saveSetupTimer) clearTimeout(saveSetupTimer);
-  saveSetupTimer = setTimeout(saveSetup, 250);
-}
-
-function applySetupData(data) {
-  if (!data) return false;
-  if (data.planStart) $("planStart").value = data.planStart;
-  if (data.planDate !== undefined) $("planDate").value = data.planDate;
-  if (data.meetingTitle !== undefined) $("meetingTitle").value = data.meetingTitle;
-  if (data.totalMin != null) $("totalMin").value = data.totalMin;
-  if (data.preStartMin != null) $("preStartMin").value = data.preStartMin;
-  if (data.preEndSec != null) $("preEndSec").value = data.preEndSec;
-  if (typeof data.overrunMode === "boolean") $("overrunMode").checked = data.overrunMode;
-  if (data.rows && data.rows.length) {
-    rows.length = 0;
-    data.rows.forEach((r) => {
-      rows.push({ name: String(r.name || ""), min: clampNum(r.min, 0, 600), sec: clampNum(r.sec, 0, 59) });
-    });
-  }
-  return true;
-}
-
-function loadSetup() {
-  return applySetupData(loadSetupData());
 }
 
 function persistRun() {
@@ -394,7 +131,7 @@ async function restoreRun() {
     skipLockUntil = 0;
     backLockUntil = 0;
     extendLockUntil = 0;
-    lastRenderKey = "";
+    resetRunView();
     $("setup").hidden = true;
     $("run").hidden = false;
     document.title = "MTGタイマー｜実行中";
@@ -410,6 +147,7 @@ async function restoreRun() {
 
 function buildItems(planStartMs) {
   const items = [];
+  const rows = getRows();
   let cum = 0;
   rows.forEach((r) => {
     const dur = rowDur(r);
@@ -648,7 +386,7 @@ async function startRun(mode) {
   skipLockUntil = 0;
   backLockUntil = 0;
   extendLockUntil = 0;
-  lastRenderKey = "";
+  resetRunView();
 
   if (tickTimer) {
     clearTimeout(tickTimer);
@@ -868,7 +606,7 @@ function tick() {
     }
   }
 
-  renderRun(now);
+  renderRun(R, now);
   tickTimer = setTimeout(tick, R.ended ? 1000 : 250);
 }
 
@@ -885,296 +623,6 @@ function recordHistory() {
   });
   renderHistory();
 }
-
-function applyHistoryTemplate(entry) {
-  if (!entry || !Array.isArray(entry.items) || entry.items.length === 0) {
-    toast("再利用できる議題がありません。");
-    return;
-  }
-  const nextRows = [];
-  let prev = entry.planStartMs;
-  entry.items.forEach((it) => {
-    const sec = Math.max(0, Math.round((it.endMs - prev) / 1000));
-    prev = it.endMs;
-    nextRows.push({ name: it.name, min: Math.floor(sec / 60), sec: sec % 60 });
-  });
-  if (!nextRows.some((row) => row.min > 0 || row.sec > 0)) {
-    toast("再利用できる議題がありません。");
-    return;
-  }
-  const total = Math.max(1, Math.min(480, Math.ceil((entry.meetEndMs - entry.planStartMs) / 60000)));
-  $("meetingTitle").value = entry.title || "";
-  $("totalMin").value = String(total);
-  rows.length = 0;
-  nextRows.forEach((row) => rows.push(row));
-  renderRows();
-  toast("会議履歴から議題を読み込みました。");
-}
-
-function renderRun(now) {
-  updateSoundButton();
-  const runTitle = R.title || "";
-  $("meetingName").textContent = runTitle;
-  $("meetingName").hidden = !runTitle;
-  $("jstRunClock").textContent = fmtHMS(now);
-  $("meetEndLabel").textContent = R.ended ? "終了時刻" : "会議終了";
-  $("meetEnd").textContent = fmtClockRel(R.ended && R.actualEndMs ? R.actualEndMs : R.meetEndMs, now);
-  const overrun = !!R.overrun;
-  const waiting = now < R.actStartMs;
-  $("meetLeftLabel").textContent = overrun ? "超過" : "会議の残り";
-  $("meetLeft").textContent = overrun ? fmtDur(now - R.meetEndMs) : fmtDur(Math.max(0, R.meetEndMs - now));
-  $("meetLeft").classList.toggle("over", overrun);
-  $("finishBtn").hidden = R.ended || waiting;
-  $("skipBtn").hidden = overrun || R.ended || R.idx < 0;
-  $("backBtn").hidden = overrun || R.ended;
-  $("extendBtn").hidden = R.ended;
-  $("copyBtn").hidden = !R.ended;
-
-  if (R.ended) {
-    $("curLabel").textContent = "会議";
-    $("curName").textContent = "終了";
-    $("curLeft").textContent = "終了";
-    $("curLeft").className = "clock endjp";
-    $("curEndLabel").textContent = "会議終了";
-    $("curEnd").textContent = fmtClockRel(R.actualEndMs || R.meetEndMs, now);
-    $("curPrev").textContent = "開始 " + fmtClockRel(R.actStartMs, now)
-      + "　／　終了 " + fmtClockRel(R.actualEndMs || R.meetEndMs, now)
-      + "（予定 " + fmtClockRel(R.meetEndMs, now) + "）";
-    $("curBar").style.width = "100%";
-    $("nextName").textContent = "—";
-    $("nextEnd").textContent = "--:--:--";
-  } else if (overrun) {
-    $("curLabel").textContent = "会議";
-    $("curName").textContent = "超過中";
-    $("curLeft").textContent = "+" + fmtDur(now - R.meetEndMs);
-    $("curLeft").className = "clock over";
-    $("curEndLabel").textContent = "予定終了";
-    $("curEnd").textContent = fmtClockRel(R.meetEndMs, now);
-    $("curPrev").textContent = "「会議を終了」を押すまで継続します";
-    $("curBar").style.width = "100%";
-    $("nextName").textContent = "—";
-    $("nextEnd").textContent = "--:--:--";
-  } else if (waiting) {
-    const startLabel = fmtClockRel(R.actStartMs, now);
-    let prev = "開始予定 " + fmtPlanStartLabel(R.actStartMs, now);
-    if (R.startPreEnabled && !R.startPreFired) prev += "　開始前アラーム " + fmtClockRel(R.startPreMs, now);
-    else if (R.startPreEnabled && R.startPreMissed) prev += "　開始前アラームは時間切れ";
-    else if (R.startPreEnabled && R.startPreFired) prev += "　開始前アラーム済み";
-    else prev += "　開始時刻になると自動でタイマーが進みます";
-    $("curLabel").textContent = "開始待ち";
-    $("curName").textContent = "MTG開始まで";
-    $("curLeft").textContent = fmtDur(R.actStartMs - now);
-    $("curLeft").className = "clock small";
-    $("curEndLabel").textContent = "MTG開始";
-    $("curEnd").textContent = startLabel;
-    $("curPrev").textContent = prev;
-    $("curBar").style.width = "0%";
-    $("nextName").textContent = R.idx >= 0 ? R.items[R.idx].name : "—";
-    $("nextEnd").textContent = R.idx >= 0 ? fmtClockRel(R.items[R.idx].endMs, now) : "--:--:--";
-  } else if (R.idx >= 0) {
-    const it = R.items[R.idx];
-    const rem = it.endMs - now;
-    const note = [];
-    if (it.note) note.push(it.note);
-    if (R.preEndSec > 0) {
-      const preMs = it.endMs - R.preEndSec * 1000;
-      if (!it.preFired && preMs > now) note.push("終了前アラーム " + fmtClockRel(preMs, now));
-    }
-    $("curLabel").textContent = "いまの議題";
-    $("curName").textContent = it.name;
-    $("curLeft").textContent = rem > 0 ? fmtDur(rem) : "0:00";
-    $("curLeft").className = "clock" + (rem <= 0 ? " fin" : rem <= 30000 ? " warn" : "");
-    $("curEndLabel").textContent = "この議題の終了";
-    $("curEnd").textContent = fmtClockRel(it.endMs, now);
-    $("curPrev").textContent = note.join("　");
-    const win = Math.max(1000, it.endMs - it.anchorMs);
-    const pct = Math.max(0, Math.min(100, (now - it.anchorMs) / win * 100));
-    $("curBar").style.width = pct + "%";
-    let nx = R.idx + 1;
-    while (nx < R.items.length && R.items[nx].status !== "wait") nx++;
-    $("nextName").textContent = nx < R.items.length ? R.items[nx].name : "（最後の議題です）";
-    $("nextEnd").textContent = nx < R.items.length ? fmtClockRel(R.items[nx].endMs, now) : fmtClockRel(R.meetEndMs, now);
-  } else {
-    $("curLabel").textContent = "いまの議題";
-    $("curName").textContent = "すべての議題が終了";
-    $("curLeft").textContent = fmtDur(Math.max(0, R.meetEndMs - now));
-    $("curLeft").className = "clock small";
-    $("curEndLabel").textContent = "会議終了";
-    $("curEnd").textContent = fmtClockRel(R.meetEndMs, now);
-    $("curPrev").textContent = "";
-    $("curBar").style.width = "100%";
-    $("nextName").textContent = "—";
-    $("nextEnd").textContent = "--:--:--";
-  }
-
-  const key = (R.ended ? "E" : overrun ? "O" : waiting ? "W" : "R") + "|" + R.idx + "|" + R.meetEndMs + "|" + dayIndexJst(now) + "|"
-    + R.items.map((it) => it.name + ":" + it.status + ":" + it.endMs + ":" + it.note).join("|");
-  if (key !== lastRenderKey) {
-    lastRenderKey = key;
-    const tl = $("timeline");
-    tl.innerHTML = "";
-    const total = Math.max(1, R.meetEndMs - R.planStartMs);
-    let prevEnd = R.planStartMs;
-    R.items.forEach((it) => {
-      const d = Math.max(0, it.endMs - prevEnd);
-      prevEnd = it.endMs;
-      const seg = document.createElement("div");
-      const cls = it.status === "run" ? (waiting ? "fut" : "cur") : it.status === "wait" ? "fut" : it.status === "skip" ? "skip" : "past";
-      seg.className = "seg " + cls;
-      seg.style.flex = "0 0 " + (d / total * 100) + "%";
-      seg.title = it.name + "　終了 " + fmtClockRel(it.endMs, now) + (it.status === "skip" ? "（スキップ）" : "");
-      const sp = document.createElement("span");
-      sp.textContent = it.name;
-      seg.appendChild(sp);
-      tl.appendChild(seg);
-    });
-    if (R.meetEndMs - prevEnd > 500) {
-      const seg = document.createElement("div");
-      seg.className = "seg fut";
-      seg.style.flex = "1 1 auto";
-      seg.title = "割り振り外の余白";
-      tl.appendChild(seg);
-    }
-
-    const body = $("runBody");
-    body.innerHTML = "";
-    runRowRefs = [];
-    R.items.forEach((it) => {
-      const tr = document.createElement("tr");
-      const td1 = document.createElement("td");
-      const b = document.createElement("b");
-      const isCurrent = it.status === "run" && !waiting;
-      b.textContent = it.name + (isCurrent ? "（実行中）" : "");
-      td1.appendChild(b);
-      if (it.note) {
-        const em = document.createElement("i");
-        em.style.cssText = "display:block;font-style:normal;color:var(--warn);font-size:11px";
-        em.textContent = "↳ " + it.note;
-        td1.appendChild(em);
-      }
-      const td2 = document.createElement("td");
-      td2.className = "num";
-      td2.textContent = fmtClockRel(it.endMs, now);
-      const td3 = document.createElement("td");
-      td3.className = "num";
-      const td4 = document.createElement("td");
-      const display = (waiting && it.status === "run") ? ["開始待ち", "wait"] : ST[it.status];
-      td4.className = "st " + display[1];
-      td4.textContent = display[0];
-      tr.appendChild(td1);
-      tr.appendChild(td2);
-      tr.appendChild(td3);
-      tr.appendChild(td4);
-      body.appendChild(tr);
-      runRowRefs.push(td3);
-    });
-  }
-
-  R.items.forEach((it, i) => {
-    const ref = runRowRefs[i];
-    if (ref) ref.textContent = (it.status === "done" || it.status === "skip") ? "—" : fmtDur(Math.max(0, it.endMs - now));
-  });
-
-  const titlePrefix = R.title ? R.title + "｜" : "";
-  document.title = titlePrefix + (R.ended
-    ? "終了｜MTGタイマー"
-    : overrun
-      ? "超過 +" + fmtDur(now - R.meetEndMs) + "｜MTGタイマー"
-      : waiting
-        ? "開始待ち " + $("curLeft").textContent + "｜MTGタイマー"
-        : R.idx >= 0
-          ? $("curLeft").textContent + " " + R.items[R.idx].name + "｜MTGタイマー"
-          : "残り " + $("curLeft").textContent + "｜MTGタイマー");
-}
-
-function refreshPlanDate() {
-  const ps = parseTime($("planStart").value);
-  if (ps == null) {
-    $("planDateDisp").textContent = "開始予定：--";
-    return;
-  }
-  const total = clampNum($("totalMin").value, 0, 480) * 60;
-  const now = Date.now();
-  const planStartMs = computePlanStartMs(ps, total, now);
-  if (planStartMs == null) {
-    $("planDateDisp").textContent = "開始予定：日付が不正です";
-    return;
-  }
-  $("planDateDisp").textContent = "開始予定：" + fmtPlanStartLabel(planStartMs, now);
-}
-
-function setupClockTick() {
-  $("jstSetupClock").textContent = fmtHMS(Date.now());
-  if (!$("setup").hidden) updateCalc(true);
-}
-
-$("addItem").addEventListener("click", () => {
-  if (rows.length >= 100) {
-    toast("議題は100件までです。");
-    return;
-  }
-  rows.push({ name: "", min: 5, sec: 0 });
-  renderRows();
-  const name = document.querySelector(`#agendaBody tr:nth-child(${rows.length}) input.nm`);
-  if (name) name.focus();
-});
-
-$("applyTemplateBtn").addEventListener("click", () => {
-  const key = $("templateSelect").value;
-  const tpl = TEMPLATES[key];
-  if (!tpl) {
-    toast("テンプレートを選択してください。");
-    return;
-  }
-  if (!window.confirm("現在の議題をテンプレート「" + tpl.label + "」で置き換えます。よろしいですか？")) return;
-  $("totalMin").value = tpl.totalMin;
-  rows.length = 0;
-  tpl.rows.forEach((r) => rows.push({ name: r.name, min: r.min, sec: r.sec }));
-  renderRows();
-  $("templateSelect").value = "";
-  toast("テンプレート「" + tpl.label + "」を適用しました。");
-});
-
-$("exportBtn").addEventListener("click", () => {
-  const blob = new Blob([serializeSetup(collectSetupData())], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "mtg-timer-settings.json";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  toast("設定をJSONで書き出しました。");
-});
-
-$("importBtn").addEventListener("click", () => {
-  $("importFile").click();
-});
-
-$("importFile").addEventListener("change", async () => {
-  const file = $("importFile").files && $("importFile").files[0];
-  if (!file) return;
-  try {
-    if (file.size > 1024 * 1024) {
-      toast("JSONファイルが大きすぎます（1MBまで）。");
-      return;
-    }
-    const text = await file.text();
-    const data = parseImportedSetup(text);
-    if (!data) {
-      toast("JSONを読み込めませんでした。形式を確認してください。");
-      return;
-    }
-    applySetupData(data);
-    renderRows();
-    toast("設定を読み込みました。");
-  } catch (e) {
-    toast("JSONを読み込めませんでした。");
-  } finally {
-    $("importFile").value = "";
-  }
-});
 
 let deferredInstallPrompt = null;
 
@@ -1199,22 +647,6 @@ window.addEventListener("appinstalled", () => {
   $("installBtn").hidden = true;
 });
 
-
-function bindNumberField(id, min, max) {
-  const inp = $(id);
-  inp.addEventListener("input", () => updateCalc());
-  inp.addEventListener("change", () => {
-    inp.value = clampNum(inp.value, min, max);
-    updateCalc();
-  });
-}
-
-bindNumberField("totalMin", 1, 480);
-bindNumberField("preStartMin", 0, 60);
-bindNumberField("preEndSec", 0, 300);
-$("planStart").addEventListener("input", () => updateCalc());
-$("planDate").addEventListener("input", () => updateCalc());
-$("overrunMode").addEventListener("change", scheduleSaveSetup);
 
 $("voiceTestBtn").addEventListener("click", () => {
   enableAudio();
@@ -1257,15 +689,11 @@ document.addEventListener("fullscreenchange", () => {
   $("fsBtn").textContent = document.fullscreenElement ? "全画面を終了" : "全画面";
 });
 
-$("startNowBtn").addEventListener("click", () => startRun("now"));
-$("startFixedBtn").addEventListener("click", () => startRun("fixed"));
-$("startPlanBtn").addEventListener("click", () => startRun("plan"));
-
 $("finishBtn").addEventListener("click", () => {
   if (!R || R.ended || $("finishBtn").hidden) return;
   if (!window.confirm("会議を終了しますか？")) return;
   endMeeting(true);
-  renderRun(Date.now());
+  renderRun(R, Date.now());
 });
 
 $("extendMin").addEventListener("input", () => {
@@ -1321,7 +749,7 @@ $("extendBtn").addEventListener("click", () => {
   toast(minutes + "分延長しました（会議終了 " + fmtClockRel(R.meetEndMs, now) + "）");
   persistRun();
   scheduleAlarms();
-  renderRun(now);
+  renderRun(R, now);
 });
 
 $("skipBtn").addEventListener("click", () => {
@@ -1346,7 +774,7 @@ $("skipBtn").addEventListener("click", () => {
   }
   persistRun();
   scheduleAlarms();
-  renderRun(now);
+  renderRun(R, now);
 });
 
 $("backBtn").addEventListener("click", () => {
@@ -1394,7 +822,7 @@ $("backBtn").addEventListener("click", () => {
   speak("前の内容に戻ります。" + to.name);
   persistRun();
   scheduleAlarms();
-  renderRun(now);
+  renderRun(R, now);
 });
 
 $("soundBtn").addEventListener("click", () => {
@@ -1432,7 +860,7 @@ function handleNotificationAction(action) {
     $("extendBtn").click();
   } else if (action === "finish") {
     endMeeting(true);
-    renderRun(Date.now());
+    renderRun(R, Date.now());
   }
 }
 
@@ -1464,8 +892,7 @@ $("quitBtn").addEventListener("click", () => {
   if (document.fullscreenElement) {
     document.exitFullscreen().catch(() => {});
   }
-  lastRenderKey = "";
-  runRowRefs = [];
+  resetRunView();
   clearRunData();
   $("run").hidden = true;
   $("setup").hidden = false;
@@ -1556,9 +983,8 @@ if ("serviceWorker" in navigator && !navigator.webdriver && !location.search.inc
   });
 }
 
+initSetup({ onStart: startRun });
 initHistory({ onApplyTemplate: applyHistoryTemplate });
-loadSetup();
-renderRows();
 renderHistory();
 updateNotifyButton();
 setupClockTick();
