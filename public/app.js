@@ -374,6 +374,8 @@ async function restoreRun() {
     R = saved;
     R.ended = false;
     R.title = typeof R.title === "string" ? R.title.slice(0, 100) : "";
+    R.extendMin = Number.isFinite(R.extendMin) ? clampNum(R.extendMin, 1, 60) : 5;
+    $("extendMin").value = R.extendMin;
     R.overrunMode = overrunMode;
     R.overrun = !!R.overrun && now >= R.meetEndMs;
     R.preEndSec = clampNum(R.preEndSec, 0, 300);
@@ -540,6 +542,7 @@ async function startRun(mode) {
   const preEndSec = clampNum($("preEndSec").value, 0, 300);
   const overrunMode = $("overrunMode").checked;
   const meetingTitle = $("meetingTitle").value.trim().slice(0, 100);
+  const extendMin = clampNum($("extendMin").value, 1, 60);
   $("totalMin").value = totalMin;
   $("preStartMin").value = preStartMin;
   $("preEndSec").value = preEndSec;
@@ -621,6 +624,7 @@ async function startRun(mode) {
 
   R = {
     title: meetingTitle,
+    extendMin: extendMin,
     planStartMs: planStartMs,
     actStartMs: actStartMs,
     meetEndMs: meetEndMs,
@@ -1162,7 +1166,8 @@ function renderRun(now) {
     if (ref) ref.textContent = (it.status === "done" || it.status === "skip") ? "—" : fmtDur(Math.max(0, it.endMs - now));
   });
 
-  document.title = R.ended
+  const titlePrefix = R.title ? R.title + "｜" : "";
+  document.title = titlePrefix + (R.ended
     ? "終了｜MTGタイマー"
     : overrun
       ? "超過 +" + fmtDur(now - R.meetEndMs) + "｜MTGタイマー"
@@ -1170,7 +1175,7 @@ function renderRun(now) {
         ? "開始待ち " + $("curLeft").textContent + "｜MTGタイマー"
         : R.idx >= 0
           ? $("curLeft").textContent + " " + R.items[R.idx].name + "｜MTGタイマー"
-          : "残り " + $("curLeft").textContent + "｜MTGタイマー";
+          : "残り " + $("curLeft").textContent + "｜MTGタイマー");
 }
 
 function refreshPlanDate() {
@@ -1382,8 +1387,20 @@ $("finishBtn").addEventListener("click", () => {
   renderRun(Date.now());
 });
 
+$("extendMin").addEventListener("input", () => {
+  if (R && !R.ended) {
+    R.extendMin = clampNum($("extendMin").value, 1, 60);
+    persistRun();
+  }
+});
+
 $("extendMin").addEventListener("change", () => {
-  $("extendMin").value = clampNum($("extendMin").value, 1, 60);
+  const value = clampNum($("extendMin").value, 1, 60);
+  $("extendMin").value = value;
+  if (R && !R.ended) {
+    R.extendMin = value;
+    persistRun();
+  }
 });
 
 $("extendBtn").addEventListener("click", () => {
@@ -1393,6 +1410,7 @@ $("extendBtn").addEventListener("click", () => {
   extendLockUntil = now + 500;
   const minutes = clampNum($("extendMin").value, 1, 60);
   $("extendMin").value = minutes;
+  R.extendMin = minutes;
   const delta = minutes * 60000;
 
   if (R.overrun) {

@@ -334,10 +334,12 @@ test.describe("MTG timer", () => {
     await page.click("#startNowBtn");
     await expect(page.locator("#run")).toBeVisible();
     expect(await page.evaluate(() => !!sessionStorage.getItem("mtgTimer.run.v1"))).toBe(true);
+    await page.fill("#extendMin", "10");
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForTimeout(200);
     await expect(page.locator("#run")).toBeVisible();
     await expect(page.locator("#curName")).toHaveText("復元確認");
+    await expect(page.locator("#extendMin")).toHaveValue("10");
     await expect(page.locator("#soundBtn")).toHaveText("音声を有効化");
     await page.click("#soundBtn");
     await page.waitForTimeout(150);
@@ -568,6 +570,7 @@ test.describe("MTG timer", () => {
     await page.click("#startNowBtn");
     await expect(page.locator("#run")).toBeVisible();
     await expect(page.locator("#meetingName")).toHaveText("定例会");
+    await expect(page).toHaveTitle(/定例会/);
     await page.click("#finishBtn");
     await expect(page.locator("#curName")).toHaveText("終了");
     await page.click("#quitBtn");
