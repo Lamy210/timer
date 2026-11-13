@@ -1,4 +1,4 @@
-import { TEMPLATES, loadSetupData, saveSetupData, loadRunData, saveRunData, clearRunData, serializeSetup, parseImportedSetup } from "./js/storage.js";
+import { TEMPLATES, STORAGE_HISTORY, loadSetupData, saveSetupData, loadRunData, saveRunData, clearRunData, serializeSetup, parseImportedSetup, loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistoryData } from "./js/storage.js";
 import { getSoundOn, setSoundOn, isAudioUnlocked, unlockAudio, playSequence, scheduleSequence, clearScheduled, audioNow, speak, cancelSpeech, notify, requestNotificationPermission } from "./js/alerts.js";
 import { jstParts, fmtHMS, fmtClock, dayIndexJst, fmtClockRel, fmtPlanStartLabel, resolvePlanStartMs, getFixedStartInfoFromMs, dateTodToMs, fmtDur, remainSpeech, parseTime, todToMs, clampNum } from "./js/time.js";
 const $ = (id) => document.getElementById(id);
@@ -760,6 +760,7 @@ function endMeeting(manual) {
     if (it.status === "wait" || it.status === "run") it.status = "done";
   });
   R.idx = -1;
+  recordHistory();
   if (manual || !R.endBeepScheduled) playSequence("end");
   if (manual) clearScheduled();
   showEndBanner(manual, endMs);
@@ -818,21 +819,94 @@ const ST = {
   skip: ["スキップ", "skipc"]
 };
 
-function buildSummary() {
+function buildSummary(run) {
   const now = Date.now();
-  const actualEnd = R.actualEndMs || R.meetEndMs;
+  const actualEnd = run.actualEndMs || run.meetEndMs;
   const lines = [
     "MTGタイマー結果",
-    "開始: " + fmtClockRel(R.actStartMs, now),
-    "終了: " + fmtClockRel(actualEnd, now) + "（予定 " + fmtClockRel(R.meetEndMs, now) + "）",
-    "実際の長さ: " + fmtDur(actualEnd - R.actStartMs),
-    "予定の長さ: " + fmtDur(R.meetEndMs - R.planStartMs),
+    "開始: " + fmtClockRel(run.actStartMs, now),
+    "終了: " + fmtClockRel(actualEnd, now) + "（予定 " + fmtClockRel(run.meetEndMs, now) + "）",
+    "実際の長さ: " + fmtDur(actualEnd - run.actStartMs),
+    "予定の長さ: " + fmtDur(run.meetEndMs - run.planStartMs),
     ""
   ];
-  R.items.forEach((it) => {
+  run.items.forEach((it) => {
     lines.push("- " + it.name + " | 予定終了 " + fmtClockRel(it.endMs, now) + " | " + ST[it.status][0] + (it.note ? " | " + it.note : ""));
   });
   return lines.join("\n");
+}
+
+function recordHistory() {
+  if (!R) return;
+  saveHistoryEntry({
+    id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8),
+    planStartMs: R.planStartMs,
+    actStartMs: R.actStartMs,
+    meetEndMs: R.meetEndMs,
+    actualEndMs: R.actualEndMs || R.meetEndMs,
+    items: R.items.map((it) => ({ name: it.name, status: it.status, endMs: it.endMs, note: it.note }))
+  });
+  renderHistory();
+}
+
+function renderHistory() {
+  const card = $("historyCard");
+  const list = $("historyList");
+  if (!card || !list) return;
+  const history = loadHistory();
+  card.hidden = history.length === 0;
+  list.innerHTML = "";
+  const now = Date.now();
+  history.forEach((entry) => {
+    const item = document.createElement("div");
+    item.className = "historyItem";
+    const main = document.createElement("div");
+    main.className = "historyMain";
+    const title = document.createElement("div");
+    title.className = "historyTitle";
+    title.textContent = "開始 " + fmtPlanStartLabel(entry.actStartMs, now) + "　／　終了 " + fmtClockRel(entry.actualEndMs, now);
+    const meta = document.createElement("div");
+    meta.className = "historyMeta";
+    const skipped = entry.items.filter((it) => it.status === "skip").length;
+    meta.textContent = "予定終了 " + fmtClockRel(entry.meetEndMs, now)
+      + "　／　実際 " + fmtDur(entry.actualEndMs - entry.actStartMs)
+      + "　／　" + entry.items.length + "件"
+      + (skipped > 0 ? "（スキップ " + skipped + "件）" : "");
+    const names = entry.items.map((it) => it.name).filter(Boolean);
+    const agenda = document.createElement("div");
+    agenda.className = "historyAgenda";
+    agenda.textContent = names.slice(0, 5).join(" / ") + (names.length > 5 ? " ほか" + (names.length - 5) + "件" : "");
+    main.appendChild(title);
+    main.appendChild(meta);
+    if (agenda.textContent) main.appendChild(agenda);
+    const ops = document.createElement("div");
+    ops.className = "historyOps";
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "mini";
+    copy.textContent = "コピー";
+    copy.addEventListener("click", async () => {
+      try {
+        await copyText(buildSummary(entry));
+        toast("会議結果をコピーしました。");
+      } catch (e) {
+        toast("コピーできませんでした。");
+      }
+    });
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "mini";
+    del.textContent = "削除";
+    del.addEventListener("click", () => {
+      deleteHistoryEntry(entry.id);
+      renderHistory();
+    });
+    ops.appendChild(copy);
+    ops.appendChild(del);
+    item.appendChild(main);
+    item.appendChild(ops);
+    list.appendChild(item);
+  });
 }
 
 function fallbackCopy(text) {
@@ -1343,11 +1417,23 @@ $("soundBtn").addEventListener("click", () => {
 $("copyBtn").addEventListener("click", async () => {
   if (!R || !R.ended) return;
   try {
-    await copyText(buildSummary());
+    await copyText(buildSummary(R));
     toast("会議結果をコピーしました。");
   } catch (e) {
     toast("コピーできませんでした。");
   }
+});
+
+$("clearHistoryBtn").addEventListener("click", () => {
+  if (loadHistory().length === 0) return;
+  if (!window.confirm("会議履歴をすべて削除しますか？")) return;
+  clearHistoryData();
+  renderHistory();
+  toast("会議履歴を削除しました。");
+});
+
+window.addEventListener("storage", (event) => {
+  if (event.key === STORAGE_HISTORY) renderHistory();
 });
 
 $("quitBtn").addEventListener("click", () => {
@@ -1431,6 +1517,7 @@ if ("serviceWorker" in navigator && !navigator.webdriver && !location.search.inc
 
 loadSetup();
 renderRows();
+renderHistory();
 updateNotifyButton();
 setupClockTick();
 setInterval(setupClockTick, 1000);

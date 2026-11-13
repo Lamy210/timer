@@ -544,6 +544,31 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("finished meetings are recorded in history", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.click("#startNowBtn");
+    await expect(page.locator("#run")).toBeVisible();
+    await page.click("#finishBtn");
+    await expect(page.locator("#curName")).toHaveText("終了");
+    await page.click("#quitBtn");
+    await expect(page.locator("#setup")).toBeVisible();
+    await expect(page.locator("#historyCard")).toBeVisible();
+    await expect(page.locator("#historyList")).toContainText("挨拶・議題確認");
+
+    await page.locator("#historyList button").filter({ hasText: "コピー" }).click();
+    await page.waitForTimeout(50);
+    const copied = await page.evaluate(() => window.__copiedText || "");
+    expect(copied).toContain("MTGタイマー結果");
+    expect(copied).toContain("挨拶・議題確認");
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator("#historyCard")).toBeVisible();
+
+    await page.locator("#historyList button").filter({ hasText: "削除" }).click();
+    await expect(page.locator("#historyCard")).toBeHidden();
+    expect(errors).toEqual([]);
+  });
+
   test("template selection applies a preset", async ({ page }) => {
     const errors = await setupPage(page);
     await page.selectOption("#templateSelect", "short");

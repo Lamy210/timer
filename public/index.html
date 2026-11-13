@@ -67,6 +67,13 @@
     </div>
     <p class="hint starthelp">「今すぐ開始（再計算）」は現在時刻基準で終了時刻を再計算します。「今すぐ開始（終了維持）」は予定終了時刻を固定して今すぐ開始します（予定が2時間以上先・終了済みの場合は使えません）。「開始時刻まで待機」は予定時刻まで待機し、開始前アラームも鳴ります。超過表示がオンの場合、終了時刻後も「会議を終了」を押すまで継続します。</p>
   </div>
+  <div class="card" id="historyCard" hidden>
+    <div class="historyHead">
+      <h2>会議履歴</h2>
+      <button type="button" id="clearHistoryBtn">すべて削除</button>
+    </div>
+    <div id="historyList"></div>
+  </div>
 </section>
 
 <section id="run" hidden>

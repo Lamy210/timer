@@ -44,6 +44,15 @@ button:disabled{opacity:.4;cursor:not-allowed}
 #warn{color:var(--red);font-size:13px}
 .startbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
 .starthelp{margin:10px 0 0}
+.historyHead{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.historyHead h2{font-size:16px;margin:0;flex:1}
+.historyItem{display:flex;gap:12px;align-items:flex-start;border-top:1px solid var(--line);padding:10px 0}
+.historyItem:first-child{border-top:0;padding-top:0}
+.historyMain{flex:1;min-width:0}
+.historyTitle{font-size:14px;color:var(--tx);overflow-wrap:anywhere}
+.historyMeta{font-size:12px;color:var(--sub);margin-top:3px;overflow-wrap:anywhere}
+.historyAgenda{font-size:12px;color:var(--tx);margin-top:4px;overflow-wrap:anywhere}
+.historyOps{display:flex;gap:6px;flex-wrap:wrap}
 label.check{flex-direction:row;align-items:center;gap:8px;font-size:12px;color:var(--sub);margin-top:10px}
 input[type=checkbox]{width:auto;padding:0;accent-color:var(--ac)}
 #run header{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
@@ -96,4 +105,4 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--ac)}
 :fullscreen .clock.endjp{font-size:clamp(64px,18vw,190px)}
 :fullscreen #curName{font-size:clamp(22px,4vw,48px)}
 :fullscreen .mainbox{padding:56px 20px}
-@media(max-width:640px){.clock{font-size:56px}.clock.endjp{font-size:64px}#curName{font-size:22px}input[type=time]{width:160px}.bTitle{font-size:24px}.startbar button{flex:1 1 100%}.tablehint{display:block}}
+@media(max-width:640px){.historyItem{flex-direction:column}.historyOps{width:100%}.clock{font-size:56px}.clock.endjp{font-size:64px}#curName{font-size:22px}input[type=time]{width:160px}.bTitle{font-size:24px}.startbar button{flex:1 1 100%}.tablehint{display:block}}

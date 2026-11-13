@@ -2,6 +2,8 @@ import { clampNum, parseTime, isValidDateString } from "./time.js";
 
 export const STORAGE_SETUP = "mtgTimer.setup.v1";
 export const STORAGE_RUN = "mtgTimer.run.v1";
+export const STORAGE_HISTORY = "mtgTimer.history.v1";
+const HISTORY_MAX = 20;
 
 export const TEMPLATES = {
   standard: {
@@ -105,6 +107,67 @@ export function clearRunData() {
   try {
     sessionStorage.removeItem(STORAGE_RUN);
   } catch (e) {}
+}
+
+function normalizeHistoryEntry(entry) {
+  if (!entry || typeof entry !== "object") return null;
+  if (typeof entry.id !== "string" || !entry.id) return null;
+  if (!Number.isFinite(entry.planStartMs) || !Number.isFinite(entry.actStartMs)
+    || !Number.isFinite(entry.meetEndMs) || !Number.isFinite(entry.actualEndMs)
+    || !Array.isArray(entry.items)) return null;
+  const items = entry.items.slice(0, 100).map((it) => ({
+    name: String(it && it.name || "").slice(0, 200),
+    status: ["done", "skip", "run", "wait"].includes(it && it.status) ? it.status : "done",
+    endMs: Number.isFinite(it && it.endMs) ? it.endMs : entry.actualEndMs,
+    note: String(it && it.note || "")
+  }));
+  return {
+    id: entry.id,
+    planStartMs: entry.planStartMs,
+    actStartMs: entry.actStartMs,
+    meetEndMs: entry.meetEndMs,
+    actualEndMs: entry.actualEndMs,
+    items: items
+  };
+}
+
+export function loadHistory() {
+  try {
+    const raw = localStorage.getItem(STORAGE_HISTORY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(normalizeHistoryEntry).filter(Boolean).slice(0, HISTORY_MAX);
+  } catch (e) {
+    return [];
+  }
+}
+
+export function saveHistoryEntry(entry) {
+  const normalized = normalizeHistoryEntry(entry);
+  if (!normalized) return loadHistory();
+  const history = loadHistory().filter((item) => item.id !== normalized.id);
+  history.unshift(normalized);
+  const next = history.slice(0, HISTORY_MAX);
+  try {
+    localStorage.setItem(STORAGE_HISTORY, JSON.stringify(next));
+  } catch (e) {}
+  return next;
+}
+
+export function deleteHistoryEntry(id) {
+  const next = loadHistory().filter((entry) => entry.id !== id);
+  try {
+    localStorage.setItem(STORAGE_HISTORY, JSON.stringify(next));
+  } catch (e) {}
+  return next;
+}
+
+export function clearHistoryData() {
+  try {
+    localStorage.removeItem(STORAGE_HISTORY);
+  } catch (e) {}
+  return [];
 }
 
 export function serializeSetup(data) {
