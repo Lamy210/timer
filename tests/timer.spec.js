@@ -422,6 +422,22 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("end screen shows a meeting summary", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#totalMin", "1");
+    await makeSingleAgenda(page, "まとめ", 0, 10);
+    await page.click("#startNowBtn");
+    await expect(page.locator("#endSummary")).toBeHidden();
+    await page.click("#finishBtn");
+    await expect(page.locator("#curName")).toHaveText("終了");
+    await expect(page.locator("#endSummary")).toBeVisible();
+    await expect(page.locator("#endSummary")).toContainText("予定 1:00");
+    await expect(page.locator("#endSummary")).toContainText("実績 0:00");
+    await expect(page.locator("#endSummary")).toContainText("議題 1件（完了1・スキップ0）");
+    await expect(page.locator("#endSummary")).toContainText(/（-[01]:[0-5]\d）/);
+    expect(errors).toEqual([]);
+  });
+
   test("+5 minutes extends the current and future schedule", async ({ page }) => {
     const errors = await setupPage(page);
     await page.click("#startNowBtn");

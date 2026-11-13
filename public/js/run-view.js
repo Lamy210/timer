@@ -190,6 +190,8 @@ export function renderRun(run, now) {
   });
 
   const titlePrefix = R.title ? R.title + "｜" : "";
+  renderEndSummary(R);
+
   document.title = titlePrefix + (R.ended
     ? "終了｜MTGタイマー"
     : overrun
@@ -201,3 +203,38 @@ export function renderRun(run, now) {
           : "残り " + $("curLeft").textContent + "｜MTGタイマー");
 }
 
+
+function renderEndSummary(run) {
+  const el = $("endSummary");
+  if (!el) return;
+  if (!run.ended) {
+    el.hidden = true;
+    el.textContent = "";
+    return;
+  }
+  const actualEnd = run.actualEndMs || run.meetEndMs;
+  const plannedMs = run.meetEndMs - run.planStartMs;
+  const actualMs = actualEnd - run.actStartMs;
+  const diffMs = actualEnd - run.meetEndMs;
+  const done = run.items.filter((item) => item.status === "done").length;
+  const skipped = run.items.filter((item) => item.status === "skip").length;
+  const diffText = diffMs === 0
+    ? "予定どおり"
+    : (diffMs > 0 ? "+" : "-") + fmtDur(Math.abs(diffMs));
+
+  el.textContent = "";
+  el.hidden = false;
+  const add = (label, value, kind) => {
+    const span = document.createElement("span");
+    span.textContent = label + " ";
+    const b = document.createElement("b");
+    b.textContent = value;
+    if (kind) b.className = kind;
+    span.appendChild(b);
+    el.appendChild(span);
+  };
+  add("予定", fmtDur(plannedMs));
+  add("実績", fmtDur(actualMs));
+  add("終了", fmtClockRel(actualEnd, Date.now()) + "（" + diffText + "）", diffMs > 0 ? "over" : diffMs < 0 ? "ok" : "");
+  add("議題", run.items.length + "件（完了" + done + "・スキップ" + skipped + "）");
+}
