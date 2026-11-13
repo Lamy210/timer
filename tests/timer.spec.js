@@ -616,6 +616,28 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("history entry can be reused as an agenda template", async ({ page }) => {
+    const errors = await setupPage(page);
+    await makeSingleAgenda(page, "再利用議題", 0, 2);
+    await page.fill("#meetingTitle", "再利用会議");
+    await page.fill("#totalMin", "1");
+    await page.click("#startNowBtn");
+    await expect(page.locator("#run")).toBeVisible();
+    await page.click("#finishBtn");
+    await expect(page.locator("#curName")).toHaveText("終了");
+    await page.click("#quitBtn");
+    await expect(page.locator("#historyCard")).toBeVisible();
+
+    await page.locator("#historyList button").filter({ hasText: "再利用" }).click();
+    await expect(page.locator("#meetingTitle")).toHaveValue("再利用会議");
+    await expect(page.locator("#totalMin")).toHaveValue("1");
+    expect(await page.locator("#agendaBody tr").count()).toBe(1);
+    await expect(page.locator("#agendaBody tr:nth-child(1) td:nth-child(1) input")).toHaveValue("再利用議題");
+    await expect(page.locator("#agendaBody tr:nth-child(1) td:nth-child(2) input")).toHaveValue("0");
+    await expect(page.locator("#agendaBody tr:nth-child(1) td:nth-child(3) input")).toHaveValue("2");
+    expect(errors).toEqual([]);
+  });
+
   test("template selection applies a preset", async ({ page }) => {
     const errors = await setupPage(page);
     await page.selectOption("#templateSelect", "short");

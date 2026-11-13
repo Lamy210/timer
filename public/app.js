@@ -907,6 +907,23 @@ function recordHistory() {
   renderHistory();
 }
 
+function applyHistoryTemplate(entry) {
+  const nextRows = [];
+  let prev = entry.planStartMs;
+  entry.items.forEach((it) => {
+    const sec = Math.max(0, Math.round((it.endMs - prev) / 1000));
+    prev = it.endMs;
+    nextRows.push({ name: it.name, min: Math.floor(sec / 60), sec: sec % 60 });
+  });
+  const total = Math.max(1, Math.min(480, Math.ceil((entry.meetEndMs - entry.planStartMs) / 60000)));
+  $("meetingTitle").value = entry.title || "";
+  $("totalMin").value = String(total);
+  rows.length = 0;
+  nextRows.forEach((row) => rows.push(row));
+  renderRows();
+  toast("会議履歴から議題を読み込みました。");
+}
+
 function renderHistory() {
   const card = $("historyCard");
   const list = $("historyList");
@@ -956,6 +973,14 @@ function renderHistory() {
         toast("コピーできませんでした。");
       }
     });
+    const reuse = document.createElement("button");
+    reuse.type = "button";
+    reuse.className = "mini";
+    reuse.textContent = "再利用";
+    reuse.title = "この会議の議題を設定に読み込む";
+    reuse.addEventListener("click", () => {
+      applyHistoryTemplate(entry);
+    });
     const del = document.createElement("button");
     del.type = "button";
     del.className = "mini";
@@ -969,6 +994,7 @@ function renderHistory() {
       else $("startNowBtn").focus();
     });
     ops.appendChild(copy);
+    ops.appendChild(reuse);
     ops.appendChild(del);
     item.appendChild(main);
     item.appendChild(ops);
