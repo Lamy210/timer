@@ -307,6 +307,7 @@ function collectSetupData() {
   return {
     planStart: $("planStart").value,
     planDate: $("planDate").value,
+    meetingTitle: $("meetingTitle").value.trim().slice(0, 100),
     totalMin: clampNum($("totalMin").value, 1, 480),
     preStartMin: clampNum($("preStartMin").value, 0, 60),
     preEndSec: clampNum($("preEndSec").value, 0, 300),
@@ -328,6 +329,7 @@ function applySetupData(data) {
   if (!data) return false;
   if (data.planStart) $("planStart").value = data.planStart;
   if (data.planDate !== undefined) $("planDate").value = data.planDate;
+  if (data.meetingTitle !== undefined) $("meetingTitle").value = data.meetingTitle;
   if (data.totalMin != null) $("totalMin").value = data.totalMin;
   if (data.preStartMin != null) $("preStartMin").value = data.preStartMin;
   if (data.preEndSec != null) $("preEndSec").value = data.preEndSec;
@@ -371,6 +373,7 @@ async function restoreRun() {
     }
     R = saved;
     R.ended = false;
+    R.title = typeof R.title === "string" ? R.title.slice(0, 100) : "";
     R.overrunMode = overrunMode;
     R.overrun = !!R.overrun && now >= R.meetEndMs;
     R.preEndSec = clampNum(R.preEndSec, 0, 300);
@@ -536,6 +539,7 @@ async function startRun(mode) {
   const preStartMin = clampNum($("preStartMin").value, 0, 60);
   const preEndSec = clampNum($("preEndSec").value, 0, 300);
   const overrunMode = $("overrunMode").checked;
+  const meetingTitle = $("meetingTitle").value.trim().slice(0, 100);
   $("totalMin").value = totalMin;
   $("preStartMin").value = preStartMin;
   $("preEndSec").value = preEndSec;
@@ -616,6 +620,7 @@ async function startRun(mode) {
   const meetPreMs = meetEndMs - preEndSec * 1000;
 
   R = {
+    title: meetingTitle,
     planStartMs: planStartMs,
     actStartMs: actStartMs,
     meetEndMs: meetEndMs,
@@ -864,6 +869,7 @@ function buildSummary(run) {
   const actualEnd = run.actualEndMs || run.meetEndMs;
   const lines = [
     "MTGタイマー結果",
+    ...(run.title ? ["会議名: " + run.title] : []),
     "開始: " + fmtClockRel(run.actStartMs, now),
     "終了: " + fmtClockRel(actualEnd, now) + "（予定 " + fmtClockRel(run.meetEndMs, now) + "）",
     "実際の長さ: " + fmtDur(actualEnd - run.actStartMs),
@@ -880,6 +886,7 @@ function recordHistory() {
   if (!R) return;
   saveHistoryEntry({
     id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8),
+    title: R.title || "",
     planStartMs: R.planStartMs,
     actStartMs: R.actStartMs,
     meetEndMs: R.meetEndMs,
@@ -902,6 +909,11 @@ function renderHistory() {
     item.className = "historyItem";
     const main = document.createElement("div");
     main.className = "historyMain";
+    const names = entry.items.map((it) => it.name).filter(Boolean);
+    const nameText = entry.title || (names.slice(0, 5).join(" / ") + (names.length > 5 ? " ほか" + (names.length - 5) + "件" : ""));
+    const nameDiv = document.createElement("div");
+    nameDiv.className = "historyName";
+    nameDiv.textContent = nameText || "（会議名なし）";
     const title = document.createElement("div");
     title.className = "historyTitle";
     title.textContent = "開始 " + fmtPlanStartLabel(entry.actStartMs, now) + "　／　終了 " + fmtClockRel(entry.actualEndMs, now);
@@ -912,13 +924,13 @@ function renderHistory() {
       + "　／　実際 " + fmtDur(entry.actualEndMs - entry.actStartMs)
       + "　／　" + entry.items.length + "件"
       + (skipped > 0 ? "（スキップ " + skipped + "件）" : "");
-    const names = entry.items.map((it) => it.name).filter(Boolean);
     const agenda = document.createElement("div");
     agenda.className = "historyAgenda";
     agenda.textContent = names.slice(0, 5).join(" / ") + (names.length > 5 ? " ほか" + (names.length - 5) + "件" : "");
+    main.appendChild(nameDiv);
     main.appendChild(title);
     main.appendChild(meta);
-    if (agenda.textContent) main.appendChild(agenda);
+    if (entry.title && agenda.textContent) main.appendChild(agenda);
     const ops = document.createElement("div");
     ops.className = "historyOps";
     const copy = document.createElement("button");

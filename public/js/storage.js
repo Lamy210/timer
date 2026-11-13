@@ -50,10 +50,6 @@ function normalizeRows(rows) {
 
 export function normalizeSetupData(saved) {
   if (!saved || typeof saved !== "object") return null;
-  const hasRows = Array.isArray(saved.rows) && saved.rows.length > 0;
-  if (saved.planStart == null && saved.planDate == null && saved.totalMin == null && saved.preStartMin == null && saved.preEndSec == null && typeof saved.overrunMode !== "boolean" && !hasRows) {
-    return null;
-  }
   const data = {};
   if (saved.totalMin != null) data.totalMin = clampNum(saved.totalMin, 1, 480);
   if (saved.preStartMin != null) data.preStartMin = clampNum(saved.preStartMin, 0, 60);
@@ -65,9 +61,12 @@ export function normalizeSetupData(saved) {
   if (typeof saved.planDate === "string" && (saved.planDate === "" || isValidDateString(saved.planDate))) {
     data.planDate = saved.planDate;
   }
+  if (typeof saved.meetingTitle === "string") {
+    data.meetingTitle = saved.meetingTitle.slice(0, 100);
+  }
   const rows = normalizeRows(saved.rows);
   if (rows && rows.length) data.rows = rows;
-  return data;
+  return Object.keys(data).length ? data : null;
 }
 
 export function loadSetupData() {
@@ -123,6 +122,7 @@ function normalizeHistoryEntry(entry) {
   }));
   return {
     id: entry.id,
+    title: typeof entry.title === "string" ? entry.title.slice(0, 100) : "",
     planStartMs: entry.planStartMs,
     actStartMs: entry.actStartMs,
     meetEndMs: entry.meetEndMs,

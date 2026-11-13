@@ -546,6 +546,7 @@ test.describe("MTG timer", () => {
 
   test("finished meetings are recorded in history", async ({ page }) => {
     const errors = await setupPage(page);
+    await page.fill("#meetingTitle", "定例会");
     await page.click("#startNowBtn");
     await expect(page.locator("#run")).toBeVisible();
     await page.click("#finishBtn");
@@ -553,12 +554,14 @@ test.describe("MTG timer", () => {
     await page.click("#quitBtn");
     await expect(page.locator("#setup")).toBeVisible();
     await expect(page.locator("#historyCard")).toBeVisible();
+    await expect(page.locator("#historyList")).toContainText("定例会");
     await expect(page.locator("#historyList")).toContainText("挨拶・議題確認");
 
     await page.locator("#historyList button").filter({ hasText: "コピー" }).click();
     await page.waitForTimeout(50);
     const copied = await page.evaluate(() => window.__copiedText || "");
     expect(copied).toContain("MTGタイマー結果");
+    expect(copied).toContain("会議名: 定例会");
     expect(copied).toContain("挨拶・議題確認");
 
     await page.reload({ waitUntil: "domcontentloaded" });
@@ -569,6 +572,7 @@ test.describe("MTG timer", () => {
     const download = await downloadPromise;
     const path = await download.path();
     const data = JSON.parse(fs.readFileSync(path, "utf8"));
+    expect(data.history[0].title).toBe("定例会");
     expect(data.history[0].items[0].name).toContain("挨拶");
 
     await page.locator("#historyList button").filter({ hasText: "削除" }).click();
@@ -591,6 +595,7 @@ test.describe("MTG timer", () => {
   test("JSON export downloads the current setup", async ({ page }) => {
     const errors = await setupPage(page);
     await page.fill("#planDate", "2026-11-20");
+    await page.fill("#meetingTitle", "定例会");
     const downloadPromise = page.waitForEvent("download");
     await page.click("#exportBtn");
     const download = await downloadPromise;
@@ -601,6 +606,7 @@ test.describe("MTG timer", () => {
     expect(data.version).toBe(1);
     expect(data.totalMin).toBe(30);
     expect(data.planDate).toBe("2026-11-20");
+    expect(data.meetingTitle).toBe("定例会");
     expect(data.rows).toHaveLength(4);
     expect(errors).toEqual([]);
   });
@@ -610,6 +616,7 @@ test.describe("MTG timer", () => {
     const imported = {
       planStart: "09:30:00",
       planDate: "2026-11-20",
+      meetingTitle: "取込会議",
       totalMin: 20,
       preStartMin: 3,
       preEndSec: 20,
@@ -628,6 +635,7 @@ test.describe("MTG timer", () => {
     await expect(page.locator("#planStart")).toHaveValue("09:30:00");
     await expect(page.locator("#totalMin")).toHaveValue("20");
     await expect(page.locator("#planDate")).toHaveValue("2026-11-20");
+    await expect(page.locator("#meetingTitle")).toHaveValue("取込会議");
     await expect(page.locator("#preStartMin")).toHaveValue("3");
     await expect(page.locator("#preEndSec")).toHaveValue("20");
     await expect(page.locator("#overrunMode")).not.toBeChecked();

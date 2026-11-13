@@ -12,6 +12,7 @@ input{background:#0b0d12;border:1px solid var(--line);color:var(--tx);border-rad
 input:focus{outline:1px solid var(--ac)}
 input[type=time]{width:176px;font-variant-numeric:tabular-nums}
 input[type=date]{width:160px;font-variant-numeric:tabular-nums}
+#meetingTitle{width:200px}
 input[type=number]{width:80px;font-variant-numeric:tabular-nums}
 input.nm{width:100%}
 select{background:#0b0d12;border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:6px 8px;font-size:13px;font-family:inherit}
@@ -49,7 +50,8 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .historyItem{display:flex;gap:12px;align-items:flex-start;border-top:1px solid var(--line);padding:10px 0}
 .historyItem:first-child{border-top:0;padding-top:0}
 .historyMain{flex:1;min-width:0}
-.historyTitle{font-size:14px;color:var(--tx);overflow-wrap:anywhere}
+.historyName{font-size:14px;font-weight:700;color:var(--tx);overflow-wrap:anywhere}
+.historyTitle{font-size:13px;color:var(--sub);overflow-wrap:anywhere}
 .historyMeta{font-size:12px;color:var(--sub);margin-top:3px;overflow-wrap:anywhere}
 .historyAgenda{font-size:12px;color:var(--tx);margin-top:4px;overflow-wrap:anywhere}
 .historyOps{display:flex;gap:6px;flex-wrap:wrap}
