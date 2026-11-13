@@ -1043,5 +1043,6 @@ test.describe("MTG timer", () => {
     expect((await page.request.get("/js/run-view.js")).ok()).toBe(true);
     expect((await page.request.get("/js/run-state.js")).ok()).toBe(true);
     expect((await page.request.get("/js/run.js")).ok()).toBe(true);
+    expect((await page.request.get("/js/run-alarms.js")).ok()).toBe(true);
   });
 });

@@ -1,5 +1,5 @@
 import { loadRunData, saveRunData, clearRunData, saveHistoryEntry } from "./storage.js";
-import { getSoundOn, setSoundOn, isAudioUnlocked, unlockAudio, playSequence, scheduleSequence, clearScheduled, audioNow, speak, cancelSpeech, notify, vibrateSequence } from "./alerts.js";
+import { getSoundOn, setSoundOn, isAudioUnlocked, unlockAudio, playSequence, clearScheduled, speak, cancelSpeech, notify, vibrateSequence } from "./alerts.js";
 import { jstParts, fmtHMS, fmtClock, dayIndexJst, fmtClockRel, fmtPlanStartLabel, resolvePlanStartMs, getFixedStartInfoFromMs, dateTodToMs, fmtDur, remainSpeech, parseTime, clampNum } from "./time.js";
 import { $, toast, copyText } from "./ui.js";
 import { buildSummary } from "./result.js";
@@ -7,25 +7,7 @@ import { renderHistory } from "./history.js";
 import { getRows, saveSetup, updateCalc } from "./setup.js";
 import { buildItems, createRun, hydrateRun, autoComplete, resetBeepFlags, extendRun, skipCurrent, goBack } from "./run-state.js";
 import { renderRun, resetRunView, updateSoundButton } from "./run-view.js";
-
-let wakeLock = null;
-async function requestWakeLock() {
-  try {
-    if (!("wakeLock" in navigator)) return;
-    if (wakeLock && !wakeLock.released) return;
-    wakeLock = await navigator.wakeLock.request("screen");
-    wakeLock.addEventListener("release", () => { wakeLock = null; });
-  } catch (e) {}
-}
-
-function releaseWakeLock() {
-  try {
-    if (wakeLock) {
-      wakeLock.release();
-      wakeLock = null;
-    }
-  } catch (e) {}
-}
+import { requestWakeLock, releaseWakeLock, scheduleAlarms } from "./run-alarms.js";
 
 let R = null;
 let tickTimer = null;
@@ -105,54 +87,10 @@ export async function restoreRun() {
   }
 }
 
-function scheduleAlarms() {
-  resetBeepFlags(R);
-  if (!R || R.ended) {
-    clearScheduled();
-    return;
-  }
-  if (R.overrun) return;
-  if (!isAudioUnlocked()) {
-    clearScheduled();
-    return;
-  }
-  clearScheduled();
-  const now = Date.now();
-  const base = audioNow();
-  const minLead = 80;
-  const horizon = now + 24 * 60 * 60 * 1000;
-  const at = (eventMs) => base + (eventMs - now) / 1000;
-
-  if (!R.startAnnounced && R.actStartMs > now + minLead && R.actStartMs <= horizon) {
-    if (scheduleSequence("item", at(R.actStartMs))) R.startBeepScheduled = true;
-  }
-  if (R.startPreEnabled && !R.startPreFired && R.startPreMs > now + minLead && R.startPreMs < R.actStartMs && R.startPreMs <= horizon) {
-    if (scheduleSequence("preStart", at(R.startPreMs))) R.startPreBeepScheduled = true;
-  }
-  R.items.forEach((it) => {
-    if (it.status !== "wait" && it.status !== "run") return;
-    if (R.preEndSec > 0 && !it.preFired && it.durMs > R.preEndSec * 1000) {
-      const preMs = it.endMs - R.preEndSec * 1000;
-      if (preMs > now + minLead && preMs < it.endMs && preMs <= horizon) {
-        if (scheduleSequence("pre", at(preMs))) it.preBeepScheduled = true;
-      }
-    }
-    if (it.endMs > now + minLead && it.endMs <= horizon) {
-      if (scheduleSequence("item", at(it.endMs))) it.endBeepScheduled = true;
-    }
-  });
-  if (R.meetPreEnabled && !R.meetPreFired && R.meetPreMs > now + minLead && R.meetPreMs < R.meetEndMs && R.meetPreMs <= horizon) {
-    if (scheduleSequence("pre", at(R.meetPreMs))) R.meetPreBeepScheduled = true;
-  }
-  if (R.meetEndMs > now + minLead && R.meetEndMs <= horizon) {
-    if (scheduleSequence("end", at(R.meetEndMs))) R.endBeepScheduled = true;
-  }
-}
-
 function enableAudio() {
   unlockAudio(() => {
     updateSoundButton();
-    scheduleAlarms();
+    scheduleAlarms(R);
   });
 }
 
@@ -264,7 +202,7 @@ export async function startRun(mode) {
   requestWakeLock();
   saveSetup();
   persistRun();
-  scheduleAlarms();
+  scheduleAlarms(R);
 
   const dayDiff = dayIndexJst(planStartMs) - dayIndexJst(now);
   const lateMs = actStartMs - planStartMs;
@@ -548,7 +486,7 @@ export function initRun() {
     speak(minutes + "分延長しました。");
     toast(minutes + "分延長しました（会議終了 " + fmtClockRel(R.meetEndMs, now) + "）");
     persistRun();
-    scheduleAlarms();
+    scheduleAlarms(R);
     renderRun(R, now);
   });
 
@@ -570,7 +508,7 @@ export function initRun() {
       speak("この議題で終わりです。");
     }
     persistRun();
-    scheduleAlarms();
+    scheduleAlarms(R);
     renderRun(R, now);
   });
 
@@ -594,7 +532,7 @@ export function initRun() {
     showBanner("前の内容に戻ります", "「" + to.name + "」　終了 " + fmtClockRel(to.endMs, now), "前の内容に戻ります。" + to.name, "pre", 7000);
     speak("前の内容に戻ります。" + to.name);
     persistRun();
-    scheduleAlarms();
+    scheduleAlarms(R);
     renderRun(R, now);
   });
 
