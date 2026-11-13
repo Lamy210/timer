@@ -10,7 +10,7 @@ const rows = [
 ];
 const rowRefs = [];
 
-export function rowDur(r) {
+function rowDur(r) {
   return Math.max(0, Number(r.min) || 0) * 60 + Math.max(0, Number(r.sec) || 0);
 }
 

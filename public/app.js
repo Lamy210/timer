@@ -4,7 +4,8 @@ import { jstParts, fmtHMS, fmtClock, dayIndexJst, fmtClockRel, fmtPlanStartLabel
 import { $, toast, copyText } from "./js/ui.js";
 import { buildSummary } from "./js/result.js";
 import { initHistory, renderHistory } from "./js/history.js";
-import { initSetup, getRows, rowDur, saveSetup, updateCalc, setupClockTick, applyHistoryTemplate } from "./js/setup.js";
+import { initSetup, getRows, saveSetup, updateCalc, setupClockTick, applyHistoryTemplate } from "./js/setup.js";
+import { buildItems, createRun, hydrateRun, autoComplete, resetBeepFlags, extendRun, skipCurrent, goBack } from "./js/run-state.js";
 import { renderRun, resetRunView, updateSoundButton } from "./js/run-view.js";
 
 function updateNotifyButton() {
@@ -105,29 +106,8 @@ async function restoreRun() {
       toast("別タブでタイマーが実行中です。前回のタイマーは復元しません。");
       return false;
     }
-    R = saved;
-    R.ended = false;
-    R.title = typeof R.title === "string" ? R.title.slice(0, 100) : "";
-    R.extendMin = Number.isFinite(R.extendMin) ? clampNum(R.extendMin, 1, 60) : 5;
+    R = hydrateRun(saved, now, overrunMode);
     $("extendMin").value = R.extendMin;
-    R.overrunMode = overrunMode;
-    R.overrun = !!R.overrun && now >= R.meetEndMs;
-    R.preEndSec = clampNum(R.preEndSec, 0, 300);
-    R.startPreEnabled = !!R.startPreEnabled;
-    R.meetPreEnabled = !!R.meetPreEnabled;
-    R.startPreFired = !!R.startPreFired;
-    R.startPreMissed = !!R.startPreMissed;
-    R.meetPreFired = !!R.meetPreFired;
-    R.startBeepScheduled = false;
-    R.startPreBeepScheduled = false;
-    R.meetPreBeepScheduled = false;
-    R.endBeepScheduled = false;
-    R.items.forEach((it) => {
-      if (typeof it.note !== "string") it.note = "";
-      if (typeof it.preFired !== "boolean") it.preFired = false;
-      it.preBeepScheduled = false;
-      it.endBeepScheduled = false;
-    });
     skipLockUntil = 0;
     backLockUntil = 0;
     extendLockUntil = 0;
@@ -145,76 +125,8 @@ async function restoreRun() {
   }
 }
 
-function buildItems(planStartMs) {
-  const items = [];
-  const rows = getRows();
-  let cum = 0;
-  rows.forEach((r) => {
-    const dur = rowDur(r);
-    if (dur <= 0) return;
-    cum += dur;
-    items.push({
-      name: r.name || "（無題の議題）",
-      durMs: dur * 1000,
-      endMs: planStartMs + cum * 1000,
-      status: "wait",
-      anchorMs: null,
-      preFired: false,
-      preBeepScheduled: false,
-      endBeepScheduled: false,
-      note: ""
-    });
-  });
-  return { items, cum };
-}
-
-function suppressShortPreAlarm(it) {
-  if (R.preEndSec > 0 && it.durMs <= R.preEndSec * 1000) it.preFired = true;
-}
-
-function advanceToNext(anchorMs) {
-  let i = R.idx + 1;
-  while (i < R.items.length && R.items[i].status !== "wait") i++;
-  if (i < R.items.length) {
-    R.idx = i;
-    const it = R.items[i];
-    it.status = "run";
-    it.anchorMs = Number.isFinite(anchorMs) ? anchorMs : Date.now();
-    suppressShortPreAlarm(it);
-    return it;
-  }
-  R.idx = -1;
-  return null;
-}
-
-function autoComplete(now) {
-  let chain = 0;
-  let beepNeeded = false;
-  while (R.idx >= 0) {
-    const it = R.items[R.idx];
-    if (it.endMs > now) break;
-    if (!it.endBeepScheduled) beepNeeded = true;
-    it.status = "done";
-    chain++;
-    advanceToNext(Math.max(it.endMs, R.actStartMs));
-  }
-  return { chain: chain, beepNeeded: beepNeeded };
-}
-
-function resetBeepFlags() {
-  if (!R) return;
-  R.startBeepScheduled = false;
-  R.startPreBeepScheduled = false;
-  R.meetPreBeepScheduled = false;
-  R.endBeepScheduled = false;
-  R.items.forEach((it) => {
-    it.preBeepScheduled = false;
-    it.endBeepScheduled = false;
-  });
-}
-
 function scheduleAlarms() {
-  resetBeepFlags();
+  resetBeepFlags(R);
   if (!R || R.ended) {
     clearScheduled();
     return;
@@ -319,7 +231,7 @@ async function startRun(mode) {
     }
   }
 
-  const built = buildItems(planStartMs);
+  const built = buildItems(getRows(), planStartMs);
   if (!built.items.length) {
     toast("時間を割り振った議題を1つ以上入力してください。");
     return;
@@ -342,47 +254,21 @@ async function startRun(mode) {
 
   const actStartMs = mode === "fixed" ? now : Math.max(planStartMs, now);
   const meetEndMs = planStartMs + totalSec * 1000;
-  const lastEndMs = built.items[built.items.length - 1].endMs;
-  let skipped = 0;
-  built.items.forEach((it) => {
-    if (it.endMs <= actStartMs) {
-      it.status = "skip";
-      it.note = "開始遅延のためスキップ（終了時刻 " + fmtClock(it.endMs) + " 過ぎ）";
-      skipped++;
-    }
-  });
-
-  const startPreEnabled = mode === "plan" && planStartMs > now && preStartMin > 0;
-  const startPreMs = planStartMs - preStartMin * 60000;
-  const meetPreEnabled = preEndSec > 0 && meetEndMs - lastEndMs > preEndSec * 1000;
-  const meetPreMs = meetEndMs - preEndSec * 1000;
-
-  R = {
+  const created = createRun({
     title: meetingTitle,
-    extendMin: extendMin,
-    planStartMs: planStartMs,
-    actStartMs: actStartMs,
-    meetEndMs: meetEndMs,
-    preEndSec: preEndSec,
-    overrunMode: overrunMode,
-    overrun: false,
+    extendMin,
+    planStartMs,
+    actStartMs,
+    meetEndMs,
+    preEndSec,
+    overrunMode,
     items: built.items,
-    idx: -1,
-    ended: false,
-    startAnnounced: false,
-    startPreEnabled: startPreEnabled,
-    startPreMs: startPreMs,
-    startPreFired: !startPreEnabled || startPreMs <= now,
-    startPreMissed: startPreEnabled && startPreMs <= now,
-    meetPreEnabled: meetPreEnabled,
-    meetPreMs: meetPreMs,
-    meetPreFired: !meetPreEnabled || meetPreMs <= actStartMs,
-    startBeepScheduled: false,
-    startPreBeepScheduled: false,
-    meetPreBeepScheduled: false,
-    endBeepScheduled: false
-  };
-  advanceToNext(actStartMs);
+    mode,
+    preStartMin,
+    now
+  });
+  R = created.run;
+  const skipped = created.skipped;
   skipLockUntil = 0;
   backLockUntil = 0;
   extendLockUntil = 0;
@@ -584,13 +470,13 @@ function tick() {
   if (!R.ended && !R.overrun) {
     if (now >= R.meetEndMs) {
       if (R.overrunMode) {
-        autoComplete(now);
+        autoComplete(R, now);
         enterOverrun();
       } else {
         endMeeting(false);
       }
     } else if (now >= R.actStartMs) {
-      const result = autoComplete(now);
+      const result = autoComplete(R, now);
       const chain = result.chain;
       if (chain > 0) persistRun();
       if (!R.startAnnounced) {
@@ -720,29 +606,7 @@ $("extendBtn").addEventListener("click", () => {
   const minutes = clampNum($("extendMin").value, 1, 60);
   $("extendMin").value = minutes;
   R.extendMin = minutes;
-  const delta = minutes * 60000;
-
-  if (R.overrun) {
-    R.meetEndMs = Math.max(R.meetEndMs, now) + delta;
-    R.overrun = false;
-    R.meetPreEnabled = R.preEndSec > 0;
-    R.meetPreMs = R.meetEndMs - R.preEndSec * 1000;
-    R.meetPreFired = !R.meetPreEnabled || R.meetPreMs <= now;
-  } else {
-    R.meetEndMs += delta;
-    if (R.idx >= 0) {
-      const cur = R.items[R.idx];
-      cur.endMs += delta;
-      cur.preFired = false;
-      for (let i = R.idx + 1; i < R.items.length; i++) {
-        if (R.items[i].status === "wait") R.items[i].endMs += delta;
-      }
-    }
-    const lastEndMs = R.items.length ? R.items[R.items.length - 1].endMs : R.meetEndMs;
-    R.meetPreEnabled = R.preEndSec > 0 && R.meetEndMs - lastEndMs > R.preEndSec * 1000;
-    R.meetPreMs = R.meetEndMs - R.preEndSec * 1000;
-    R.meetPreFired = !R.meetPreEnabled || R.meetPreMs <= now;
-  }
+  extendRun(R, minutes, now);
 
   showBanner(minutes + "分延長しました", "会議終了 " + fmtClockRel(R.meetEndMs, now), minutes + "分延長しました。会議終了は" + fmtClockRel(R.meetEndMs, now) + "です。", "start", 7000);
   speak(minutes + "分延長しました。");
@@ -759,12 +623,9 @@ $("skipBtn").addEventListener("click", () => {
   skipLockUntil = now + 500;
   enableAudio();
   const cur = R.items[R.idx];
-  cur.status = "skip";
+  const { next } = skipCurrent(R, now);
   cur.note = "手動スキップ（終了時刻 " + fmtClock(cur.endMs) + "）";
   playSequence("item");
-  advanceToNext(now);
-  autoComplete(now);
-  const next = R.idx >= 0 ? R.items[R.idx] : null;
   if (next) {
     showBanner("次の内容に移ってください", "「" + next.name + "」　終了 " + fmtClockRel(next.endMs, now), "次の内容に移ってください。" + next.name, "pre", 7000);
     speak("次の内容に移ってください。" + next.name);
@@ -782,41 +643,17 @@ $("backBtn").addEventListener("click", () => {
   const now = Date.now();
   if (now < backLockUntil) return;
   backLockUntil = now + 500;
-  let j = -1;
-  if (R.idx >= 0) {
-    for (let i = R.idx - 1; i >= 0; i--) {
-      if (R.items[i].status === "done" || R.items[i].status === "skip") {
-        j = i;
-        break;
-      }
-    }
-  } else {
-    for (let i = R.items.length - 1; i >= 0; i--) {
-      if (R.items[i].status === "done" || R.items[i].status === "skip") {
-        j = i;
-        break;
-      }
-    }
-  }
-  if (j < 0) {
+  const result = goBack(R, now);
+  if (!result) {
     toast("戻れる前の議題がありません。");
     return;
   }
   enableAudio();
-  const from = R.idx >= 0 ? R.items[R.idx] : null;
-  const to = R.items[j];
-  const endMs = from ? from.endMs : R.meetEndMs;
-  to.status = "run";
-  to.endMs = endMs;
-  to.anchorMs = now;
-  to.preFired = false;
-  suppressShortPreAlarm(to);
+  const { from, to, endMs } = result;
   to.note = "再開（終了時刻 " + fmtClockRel(endMs, Date.now()) + " まで）";
   if (from) {
-    from.status = "skip";
     from.note = "前の議題へ譲渡（終了時刻 " + fmtClockRel(endMs, Date.now()) + "）";
   }
-  R.idx = j;
   playSequence("item");
   showBanner("前の内容に戻ります", "「" + to.name + "」　終了 " + fmtClockRel(to.endMs, now), "前の内容に戻ります。" + to.name, "pre", 7000);
   speak("前の内容に戻ります。" + to.name);
