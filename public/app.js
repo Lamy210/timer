@@ -1249,9 +1249,9 @@ $("importHistoryFile").addEventListener("change", async () => {
       toast("履歴JSONを読み込めませんでした。");
       return;
     }
-    mergeHistoryEntries(entries);
+    const result = mergeHistoryEntries(entries);
     renderHistory();
-    toast("会議履歴を読み込みました。");
+    toast(result.added > 0 ? result.added + "件の会議履歴を読み込みました。" : "新しい会議履歴はありませんでした。");
   } catch (e) {
     toast("履歴JSONを読み込めませんでした。");
   } finally {

@@ -716,6 +716,17 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("empty history import reports no new entries", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.setInputFiles("#importHistoryFile", {
+      name: "empty-history.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify({ history: [] }))
+    });
+    await expect(page.locator("#toast")).toContainText("新しい会議履歴はありませんでした");
+    expect(errors).toEqual([]);
+  });
+
   test("oversized JSON import is rejected", async ({ page }) => {
     const errors = await setupPage(page);
     await page.setInputFiles("#importFile", {

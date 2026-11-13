@@ -156,8 +156,9 @@ export function saveHistoryEntry(entry) {
 }
 
 export function mergeHistoryEntries(entries) {
-  if (!Array.isArray(entries)) return loadHistory();
-  const byId = new Map(loadHistory().map((entry) => [entry.id, entry]));
+  const existing = loadHistory();
+  if (!Array.isArray(entries)) return { history: existing, added: 0 };
+  const byId = new Map(existing.map((entry) => [entry.id, entry]));
   entries.forEach((entry) => {
     const normalized = normalizeHistoryEntry(entry);
     if (normalized && !byId.has(normalized.id)) byId.set(normalized.id, normalized);
@@ -168,7 +169,8 @@ export function mergeHistoryEntries(entries) {
   try {
     localStorage.setItem(STORAGE_HISTORY, JSON.stringify(next));
   } catch (e) {}
-  return next;
+  const existingIds = new Set(existing.map((entry) => entry.id));
+  return { history: next, added: next.filter((entry) => !existingIds.has(entry.id)).length };
 }
 
 export function deleteHistoryEntry(id) {
