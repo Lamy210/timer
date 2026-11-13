@@ -1,17 +1,9 @@
-import { TEMPLATES, STORAGE_HISTORY, loadSetupData, saveSetupData, loadRunData, saveRunData, clearRunData, serializeSetup, parseImportedSetup, loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistoryData, mergeHistoryEntries } from "./js/storage.js";
+import { TEMPLATES, loadSetupData, saveSetupData, loadRunData, saveRunData, clearRunData, serializeSetup, parseImportedSetup, saveHistoryEntry } from "./js/storage.js";
 import { getSoundOn, setSoundOn, isAudioUnlocked, unlockAudio, playSequence, scheduleSequence, clearScheduled, audioNow, speak, cancelSpeech, notify, requestNotificationPermission, vibrateSequence } from "./js/alerts.js";
 import { jstParts, fmtHMS, fmtClock, dayIndexJst, fmtClockRel, fmtPlanStartLabel, resolvePlanStartMs, getFixedStartInfoFromMs, dateTodToMs, fmtDur, remainSpeech, parseTime, todToMs, clampNum } from "./js/time.js";
-import { csvCell, historySummaryText, historyCsvRows } from "./js/history.js";
-const $ = (id) => document.getElementById(id);
-
-let toastTimer = null;
-function toast(msg, duration) {
-  const t = $("toast");
-  t.textContent = msg;
-  t.classList.add("on");
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove("on"), duration || 4000);
-}
+import { $, toast, copyText } from "./js/ui.js";
+import { ST, buildSummary } from "./js/result.js";
+import { initHistory, renderHistory } from "./js/history.js";
 
 function updateSoundButton() {
   const btn = $("soundBtn");
@@ -873,31 +865,6 @@ function tick() {
   tickTimer = setTimeout(tick, R.ended ? 1000 : 250);
 }
 
-const ST = {
-  done: ["済", "done"],
-  run: ["実行中", "run"],
-  wait: ["待機", "wait"],
-  skip: ["スキップ", "skipc"]
-};
-
-function buildSummary(run) {
-  const now = Date.now();
-  const actualEnd = run.actualEndMs || run.meetEndMs;
-  const lines = [
-    "MTGタイマー結果",
-    ...(run.title ? ["会議名: " + run.title] : []),
-    "開始: " + fmtClockRel(run.actStartMs, now),
-    "終了: " + fmtClockRel(actualEnd, now) + "（予定 " + fmtClockRel(run.meetEndMs, now) + "）",
-    "予定: " + fmtClockRel(run.planStartMs, now) + " 〜 " + fmtClockRel(run.meetEndMs, now) + "（" + fmtDur(run.meetEndMs - run.planStartMs) + "）",
-    "実際の長さ: " + fmtDur(actualEnd - run.actStartMs),
-    ""
-  ];
-  run.items.forEach((it) => {
-    lines.push("- " + it.name + " | 予定終了 " + fmtClockRel(it.endMs, now) + " | " + ST[it.status][0] + (it.note ? " | " + it.note : ""));
-  });
-  return lines.join("\n");
-}
-
 function recordHistory() {
   if (!R) return;
   saveHistoryEntry({
@@ -935,113 +902,6 @@ function applyHistoryTemplate(entry) {
   nextRows.forEach((row) => rows.push(row));
   renderRows();
   toast("会議履歴から議題を読み込みました。");
-}
-
-function renderHistory() {
-  const card = $("historyCard");
-  const list = $("historyList");
-  if (!card || !list) return;
-  const history = loadHistory();
-  const summary = $("historySummary");
-  if (summary) summary.textContent = historySummaryText(history);
-  card.hidden = history.length === 0;
-  list.innerHTML = "";
-  const now = Date.now();
-  history.forEach((entry, index) => {
-    const item = document.createElement("div");
-    item.className = "historyItem";
-    const main = document.createElement("div");
-    main.className = "historyMain";
-    const names = entry.items.map((it) => it.name).filter(Boolean);
-    const nameText = entry.title || (names.slice(0, 5).join(" / ") + (names.length > 5 ? " ほか" + (names.length - 5) + "件" : ""));
-    const nameDiv = document.createElement("div");
-    nameDiv.className = "historyName";
-    nameDiv.textContent = nameText || "（会議名なし）";
-    const title = document.createElement("div");
-    title.className = "historyTitle";
-    title.textContent = "開始 " + fmtPlanStartLabel(entry.actStartMs, now) + "　／　終了 " + fmtClockRel(entry.actualEndMs, now);
-    const meta = document.createElement("div");
-    meta.className = "historyMeta";
-    const skipped = entry.items.filter((it) => it.status === "skip").length;
-    meta.textContent = "予定 " + fmtClockRel(entry.planStartMs, now) + " 〜 " + fmtClockRel(entry.meetEndMs, now)
-      + "　／　実際 " + fmtDur(entry.actualEndMs - entry.actStartMs)
-      + "　／　" + entry.items.length + "件"
-      + (skipped > 0 ? "（スキップ " + skipped + "件）" : "");
-    const agenda = document.createElement("div");
-    agenda.className = "historyAgenda";
-    agenda.textContent = names.slice(0, 5).join(" / ") + (names.length > 5 ? " ほか" + (names.length - 5) + "件" : "");
-    main.appendChild(nameDiv);
-    main.appendChild(title);
-    main.appendChild(meta);
-    if (entry.title && agenda.textContent) main.appendChild(agenda);
-    const ops = document.createElement("div");
-    ops.className = "historyOps";
-    const copy = document.createElement("button");
-    copy.type = "button";
-    copy.className = "mini";
-    copy.textContent = "コピー";
-    copy.addEventListener("click", async () => {
-      try {
-        await copyText(buildSummary(entry));
-        toast("会議結果をコピーしました。");
-      } catch (e) {
-        toast("コピーできませんでした。");
-      }
-    });
-    const reuse = document.createElement("button");
-    reuse.type = "button";
-    reuse.className = "mini";
-    reuse.textContent = "再利用";
-    reuse.title = "この会議の議題を設定に読み込む";
-    reuse.addEventListener("click", () => {
-      applyHistoryTemplate(entry);
-    });
-    const del = document.createElement("button");
-    del.type = "button";
-    del.className = "mini";
-    del.textContent = "削除";
-    del.addEventListener("click", () => {
-      if (!window.confirm("この会議履歴を削除しますか？")) return;
-      deleteHistoryEntry(entry.id);
-      renderHistory();
-      const buttons = document.querySelectorAll("#historyList .historyOps button:last-child");
-      const target = buttons[Math.min(index, buttons.length - 1)];
-      if (target) target.focus();
-      else $("startNowBtn").focus();
-    });
-    ops.appendChild(copy);
-    ops.appendChild(reuse);
-    ops.appendChild(del);
-    item.appendChild(main);
-    item.appendChild(ops);
-    list.appendChild(item);
-  });
-}
-
-function fallbackCopy(text) {
-  return new Promise((resolve, reject) => {
-    const ta = document.createElement("textarea");
-    ta.value = text;
-    ta.style.position = "fixed";
-    ta.style.opacity = "0";
-    document.body.appendChild(ta);
-    ta.select();
-    try {
-      document.execCommand("copy");
-      resolve();
-    } catch (e) {
-      reject(e);
-    } finally {
-      ta.remove();
-    }
-  });
-}
-
-function copyText(text) {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    return navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
-  }
-  return fallbackCopy(text);
 }
 
 function renderRun(now) {
@@ -1283,34 +1143,6 @@ $("exportBtn").addEventListener("click", () => {
 
 $("importBtn").addEventListener("click", () => {
   $("importFile").click();
-});
-
-$("importHistoryBtn").addEventListener("click", () => {
-  $("importHistoryFile").click();
-});
-
-$("importHistoryFile").addEventListener("change", async () => {
-  const file = $("importHistoryFile").files && $("importHistoryFile").files[0];
-  if (!file) return;
-  try {
-    if (file.size > 1024 * 1024) {
-      toast("履歴JSONファイルが大きすぎます（1MBまで）。");
-      return;
-    }
-    const parsed = JSON.parse(await file.text());
-    const entries = Array.isArray(parsed) ? parsed : parsed && Array.isArray(parsed.history) ? parsed.history : null;
-    if (!entries) {
-      toast("履歴JSONを読み込めませんでした。");
-      return;
-    }
-    const result = mergeHistoryEntries(entries);
-    renderHistory();
-    toast(result.added > 0 ? result.added + "件の会議履歴を読み込みました。" : "新しい会議履歴はありませんでした。");
-  } catch (e) {
-    toast("履歴JSONを読み込めませんでした。");
-  } finally {
-    $("importHistoryFile").value = "";
-  }
 });
 
 $("importFile").addEventListener("change", async () => {
@@ -1586,57 +1418,6 @@ $("copyBtn").addEventListener("click", async () => {
   }
 });
 
-$("clearHistoryBtn").addEventListener("click", () => {
-  if (loadHistory().length === 0) return;
-  if (!window.confirm("会議履歴をすべて削除しますか？")) return;
-  clearHistoryData();
-  renderHistory();
-  $("startNowBtn").focus();
-  toast("会議履歴を削除しました。");
-});
-
-$("exportHistoryCsvBtn").addEventListener("click", () => {
-  const history = loadHistory();
-  if (history.length === 0) return;
-  const now = Date.now();
-  const rows = historyCsvRows(history, now, fmtPlanStartLabel, fmtClockRel);
-  const csv = "\uFEFF" + rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "mtg-timer-history.csv";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  toast("会議履歴をCSVで書き出しました。");
-});
-
-$("exportHistoryBtn").addEventListener("click", () => {
-  const history = loadHistory();
-  if (history.length === 0) return;
-  const blob = new Blob([JSON.stringify({
-    app: "mtg-timer",
-    version: 1,
-    exportedAt: new Date().toISOString(),
-    history: history
-  }, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "mtg-timer-history.json";
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  toast("会議履歴をJSONで書き出しました。");
-});
-
-window.addEventListener("storage", (event) => {
-  if (event.key === STORAGE_HISTORY) renderHistory();
-});
-
 $("quitBtn").addEventListener("click", () => {
   if (R && !R.ended && !window.confirm("タイマーを終了して設定に戻りますか？")) return;
   releaseRunLock();
@@ -1749,6 +1530,7 @@ if ("serviceWorker" in navigator && !navigator.webdriver && !location.search.inc
   });
 }
 
+initHistory({ onApplyTemplate: applyHistoryTemplate });
 loadSetup();
 renderRows();
 renderHistory();

@@ -1003,5 +1003,7 @@ test.describe("MTG timer", () => {
     expect((await page.request.get("/icons/icon-512.png")).ok()).toBe(true);
     expect((await page.request.get("/sw.js")).ok()).toBe(true);
     expect((await page.request.get("/js/history.js")).ok()).toBe(true);
+    expect((await page.request.get("/js/ui.js")).ok()).toBe(true);
+    expect((await page.request.get("/js/result.js")).ok()).toBe(true);
   });
 });
