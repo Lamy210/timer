@@ -621,6 +621,19 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("JSON import can clear an explicit date", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#planDate", "2026-11-20");
+    await page.setInputFiles("#importFile", {
+      name: "clear-date.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify({ planDate: "" }))
+    });
+    await expect(page.locator("#toast")).toContainText("設定を読み込みました");
+    await expect(page.locator("#planDate")).toHaveValue("");
+    expect(errors).toEqual([]);
+  });
+
   test("oversized JSON import is rejected", async ({ page }) => {
     const errors = await setupPage(page);
     await page.setInputFiles("#importFile", {

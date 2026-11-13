@@ -60,7 +60,7 @@ export function normalizeSetupData(saved) {
   if (typeof saved.planStart === "string" && parseTime(saved.planStart) != null) {
     data.planStart = saved.planStart;
   }
-  if (typeof saved.planDate === "string" && isValidDateString(saved.planDate)) {
+  if (typeof saved.planDate === "string" && (saved.planDate === "" || isValidDateString(saved.planDate))) {
     data.planDate = saved.planDate;
   }
   const rows = normalizeRows(saved.rows);

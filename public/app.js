@@ -422,30 +422,31 @@ function scheduleAlarms() {
   const now = Date.now();
   const base = audioNow();
   const minLead = 80;
+  const horizon = now + 24 * 60 * 60 * 1000;
   const at = (eventMs) => base + (eventMs - now) / 1000;
 
-  if (!R.startAnnounced && R.actStartMs > now + minLead) {
+  if (!R.startAnnounced && R.actStartMs > now + minLead && R.actStartMs <= horizon) {
     if (scheduleSequence("item", at(R.actStartMs))) R.startBeepScheduled = true;
   }
-  if (R.startPreEnabled && !R.startPreFired && R.startPreMs > now + minLead && R.startPreMs < R.actStartMs) {
+  if (R.startPreEnabled && !R.startPreFired && R.startPreMs > now + minLead && R.startPreMs < R.actStartMs && R.startPreMs <= horizon) {
     if (scheduleSequence("preStart", at(R.startPreMs))) R.startPreBeepScheduled = true;
   }
   R.items.forEach((it) => {
     if (it.status !== "wait" && it.status !== "run") return;
     if (R.preEndSec > 0 && !it.preFired && it.durMs > R.preEndSec * 1000) {
       const preMs = it.endMs - R.preEndSec * 1000;
-      if (preMs > now + minLead && preMs < it.endMs) {
+      if (preMs > now + minLead && preMs < it.endMs && preMs <= horizon) {
         if (scheduleSequence("pre", at(preMs))) it.preBeepScheduled = true;
       }
     }
-    if (it.endMs > now + minLead) {
+    if (it.endMs > now + minLead && it.endMs <= horizon) {
       if (scheduleSequence("item", at(it.endMs))) it.endBeepScheduled = true;
     }
   });
-  if (R.meetPreEnabled && !R.meetPreFired && R.meetPreMs > now + minLead && R.meetPreMs < R.meetEndMs) {
+  if (R.meetPreEnabled && !R.meetPreFired && R.meetPreMs > now + minLead && R.meetPreMs < R.meetEndMs && R.meetPreMs <= horizon) {
     if (scheduleSequence("pre", at(R.meetPreMs))) R.meetPreBeepScheduled = true;
   }
-  if (R.meetEndMs > now + minLead) {
+  if (R.meetEndMs > now + minLead && R.meetEndMs <= horizon) {
     if (scheduleSequence("end", at(R.meetEndMs))) R.endBeepScheduled = true;
   }
 }
