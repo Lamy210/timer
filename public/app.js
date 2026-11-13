@@ -244,6 +244,30 @@ let lastRenderKey = "";
 let runRowRefs = [];
 let actionLockUntil = 0;
 let saveSetupTimer = null;
+let runLockRelease = null;
+
+function acquireRunLock() {
+  if (!("locks" in navigator)) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    navigator.locks.request("mtg-timer-active-run", { ifAvailable: true }, (lock) => {
+      if (!lock) {
+        resolve(false);
+        return;
+      }
+      resolve(true);
+      return new Promise((release) => {
+        runLockRelease = release;
+      });
+    }).catch(() => resolve(true));
+  });
+}
+
+function releaseRunLock() {
+  if (runLockRelease) {
+    try { runLockRelease(); } catch (e) {}
+    runLockRelease = null;
+  }
+}
 
 function collectSetupData() {
   return {
@@ -291,7 +315,7 @@ function persistRun() {
   saveRunData(R);
 }
 
-function restoreRun() {
+async function restoreRun() {
   try {
     const saved = loadRunData();
     if (!saved) return false;
@@ -304,6 +328,11 @@ function restoreRun() {
       || !Number.isFinite(saved.planStartMs) || !Number.isFinite(saved.actStartMs)
       || !Number.isFinite(saved.meetEndMs) || tooLate) {
       clearRunData();
+      return false;
+    }
+    const locked = await acquireRunLock();
+    if (!locked) {
+      toast("別タブでタイマーが実行中です。前回のタイマーは復元しません。");
       return false;
     }
     R = saved;
@@ -336,6 +365,7 @@ function restoreRun() {
     toast("前回のタイマーを復元しました。音声は「音声を有効化」を押してください。");
     return true;
   } catch (e) {
+    releaseRunLock();
     return false;
   }
 }
@@ -458,7 +488,7 @@ function enableAudio() {
   });
 }
 
-function startRun(mode) {
+async function startRun(mode) {
   enableAudio();
   const rawTotal = Number($("totalMin").value);
   if (!Number.isFinite(rawTotal) || rawTotal < 1) {
@@ -478,7 +508,6 @@ function startRun(mode) {
 
   if (mode === "now") {
     planStartMs = Math.floor(now / 1000) * 1000;
-    $("planDate").value = "";
   } else {
     const ps = parseTime($("planStart").value);
     if (ps == null) {
@@ -522,7 +551,16 @@ function startRun(mode) {
     return;
   }
 
-  if (mode === "now") $("planStart").value = fmtHMS(planStartMs);
+  const locked = await acquireRunLock();
+  if (!locked) {
+    toast("別タブでタイマーが実行中です。");
+    return;
+  }
+
+  if (mode === "now") {
+    $("planDate").value = "";
+    $("planStart").value = fmtHMS(planStartMs);
+  }
 
   const actStartMs = mode === "fixed" ? now : Math.max(planStartMs, now);
   const meetEndMs = planStartMs + totalSec * 1000;
@@ -717,6 +755,7 @@ function endMeeting(manual) {
   R.ended = true;
   R.overrun = false;
   R.actualEndMs = endMs;
+  releaseRunLock();
   R.items.forEach((it) => {
     if (it.status === "wait" || it.status === "run") it.status = "done";
   });
@@ -1313,6 +1352,7 @@ $("copyBtn").addEventListener("click", async () => {
 
 $("quitBtn").addEventListener("click", () => {
   if (R && !R.ended && !window.confirm("タイマーを終了して設定に戻りますか？")) return;
+  releaseRunLock();
   R = null;
   if (tickTimer) {
     clearTimeout(tickTimer);

@@ -209,6 +209,7 @@ test.describe("MTG timer", () => {
   test("double-click skip only skips one agenda", async ({ page }) => {
     const errors = await setupPage(page);
     await page.click("#startNowBtn");
+    await expect(page.locator("#run")).toBeVisible();
     await page.dblclick("#skipBtn");
     const result = await statuses(page);
     expect(result[0]).toBe("スキップ");
@@ -248,6 +249,7 @@ test.describe("MTG timer", () => {
     await page.fill("#planStart", "10:02:00");
     await page.fill("#totalMin", "30");
     await page.click("#startPlanBtn");
+    await expect(page.locator("#run")).toBeVisible();
     expect((await statuses(page))[0]).toBe("開始待ち");
     await expect(page.locator("#curEndLabel")).toHaveText("MTG開始");
     await expect(page.locator("#curPrev")).toContainText("開始予定 本日");
@@ -490,6 +492,7 @@ test.describe("MTG timer", () => {
     await page.fill("#totalMin", "30");
     await expect(page.locator("#startFixedBtn")).toBeEnabled();
     await page.click("#startFixedBtn");
+    await expect(page.locator("#run")).toBeVisible();
     expect((await statuses(page))[0]).toBe("スキップ");
     await expect(page.locator("#curName")).toContainText("議題1：報告");
     await expect(page.locator("#meetEnd")).toHaveText("10:30:00");
@@ -643,6 +646,29 @@ test.describe("MTG timer", () => {
     });
     await expect(page.locator("#toast")).toContainText("JSONファイルが大きすぎます");
     expect(errors).toEqual([]);
+  });
+
+  test("only one tab can run a timer at a time", async ({ context }) => {
+    const page1 = await context.newPage();
+    const page2 = await context.newPage();
+    const errors1 = await setupPage(page1);
+    const errors2 = await setupPage(page2);
+
+    await page1.click("#startNowBtn");
+    await expect(page1.locator("#run")).toBeVisible();
+
+    await page2.click("#startNowBtn");
+    await expect(page2.locator("#run")).toBeHidden();
+    await expect(page2.locator("#toast")).toContainText("別タブでタイマーが実行中です");
+
+    await page1.click("#finishBtn");
+    await expect(page1.locator("#curName")).toHaveText("終了");
+
+    await page2.click("#startNowBtn");
+    await expect(page2.locator("#run")).toBeVisible();
+
+    expect(errors1).toEqual([]);
+    expect(errors2).toEqual([]);
   });
 
   test("notification, ARIA, and fullscreen work", async ({ page }) => {
