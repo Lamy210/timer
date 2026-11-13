@@ -155,6 +155,22 @@ export function saveHistoryEntry(entry) {
   return next;
 }
 
+export function mergeHistoryEntries(entries) {
+  if (!Array.isArray(entries)) return loadHistory();
+  const byId = new Map(loadHistory().map((entry) => [entry.id, entry]));
+  entries.forEach((entry) => {
+    const normalized = normalizeHistoryEntry(entry);
+    if (normalized && !byId.has(normalized.id)) byId.set(normalized.id, normalized);
+  });
+  const next = Array.from(byId.values())
+    .sort((a, b) => b.actualEndMs - a.actualEndMs)
+    .slice(0, HISTORY_MAX);
+  try {
+    localStorage.setItem(STORAGE_HISTORY, JSON.stringify(next));
+  } catch (e) {}
+  return next;
+}
+
 export function deleteHistoryEntry(id) {
   const next = loadHistory().filter((entry) => entry.id !== id);
   try {

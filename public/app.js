@@ -1,4 +1,4 @@
-import { TEMPLATES, STORAGE_HISTORY, loadSetupData, saveSetupData, loadRunData, saveRunData, clearRunData, serializeSetup, parseImportedSetup, loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistoryData } from "./js/storage.js";
+import { TEMPLATES, STORAGE_HISTORY, loadSetupData, saveSetupData, loadRunData, saveRunData, clearRunData, serializeSetup, parseImportedSetup, loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistoryData, mergeHistoryEntries } from "./js/storage.js";
 import { getSoundOn, setSoundOn, isAudioUnlocked, unlockAudio, playSequence, scheduleSequence, clearScheduled, audioNow, speak, cancelSpeech, notify, requestNotificationPermission } from "./js/alerts.js";
 import { jstParts, fmtHMS, fmtClock, dayIndexJst, fmtClockRel, fmtPlanStartLabel, resolvePlanStartMs, getFixedStartInfoFromMs, dateTodToMs, fmtDur, remainSpeech, parseTime, todToMs, clampNum } from "./js/time.js";
 const $ = (id) => document.getElementById(id);
@@ -1229,6 +1229,34 @@ $("exportBtn").addEventListener("click", () => {
 
 $("importBtn").addEventListener("click", () => {
   $("importFile").click();
+});
+
+$("importHistoryBtn").addEventListener("click", () => {
+  $("importHistoryFile").click();
+});
+
+$("importHistoryFile").addEventListener("change", async () => {
+  const file = $("importHistoryFile").files && $("importHistoryFile").files[0];
+  if (!file) return;
+  try {
+    if (file.size > 1024 * 1024) {
+      toast("履歴JSONファイルが大きすぎます（1MBまで）。");
+      return;
+    }
+    const parsed = JSON.parse(await file.text());
+    const entries = Array.isArray(parsed) ? parsed : parsed && Array.isArray(parsed.history) ? parsed.history : null;
+    if (!entries) {
+      toast("履歴JSONを読み込めませんでした。");
+      return;
+    }
+    mergeHistoryEntries(entries);
+    renderHistory();
+    toast("会議履歴を読み込みました。");
+  } catch (e) {
+    toast("履歴JSONを読み込めませんでした。");
+  } finally {
+    $("importHistoryFile").value = "";
+  }
 });
 
 $("importFile").addEventListener("change", async () => {

@@ -598,6 +598,11 @@ test.describe("MTG timer", () => {
     await page.locator("#historyList button").filter({ hasText: "削除" }).click();
     await expect(page.locator("#historyCard")).toBeHidden();
     await expect.poll(() => page.evaluate(() => document.activeElement && document.activeElement.id)).toBe("startNowBtn");
+
+    await page.setInputFiles("#importHistoryFile", path);
+    await expect(page.locator("#toast")).toContainText("会議履歴を読み込みました");
+    await expect(page.locator("#historyCard")).toBeVisible();
+    await expect(page.locator("#historyList")).toContainText("定例会");
     expect(errors).toEqual([]);
   });
 
