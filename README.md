@@ -40,7 +40,9 @@ GitHub Pages: https://lamy210.github.io/timer/
 ## 開発
 
 - `npm install`
-- `npm test`（Playwright / Chromium・Firefox・WebKit）
+- `npm test`（Node単体テスト + Playwright / Chromium・Firefox・WebKit）
+- `npm run test:unit`（純粋ロジックのみ）
+- `npm run test:e2e`（ブラウザE2Eのみ）
 - ローカルで直接確認する場合は `python3 -m http.server 8765 --directory public` などで配信してください（ES ModulesとService Workerのため`file://`では動作しません）
 - CIではテスト成功後にGitHub Pagesへデプロイ
 
