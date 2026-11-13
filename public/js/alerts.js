@@ -75,6 +75,19 @@ export function audioNow() {
   return AC ? AC.currentTime : 0;
 }
 
+export function vibrateSequence(name) {
+  if (!soundOn || !("vibrate" in navigator)) return;
+  const patterns = {
+    preStart: [120, 80, 120],
+    pre: [100, 60, 100],
+    item: [120, 80, 120],
+    end: [300, 120, 300, 120, 500]
+  };
+  try {
+    navigator.vibrate(patterns[name] || 120);
+  } catch (e) {}
+}
+
 export function playSequence(name) {
   if (!soundOn || !AC) return;
   const seq = SEQUENCES[name];

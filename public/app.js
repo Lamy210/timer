@@ -1,5 +1,5 @@
 import { TEMPLATES, STORAGE_HISTORY, loadSetupData, saveSetupData, loadRunData, saveRunData, clearRunData, serializeSetup, parseImportedSetup, loadHistory, saveHistoryEntry, deleteHistoryEntry, clearHistoryData, mergeHistoryEntries } from "./js/storage.js";
-import { getSoundOn, setSoundOn, isAudioUnlocked, unlockAudio, playSequence, scheduleSequence, clearScheduled, audioNow, speak, cancelSpeech, notify, requestNotificationPermission } from "./js/alerts.js";
+import { getSoundOn, setSoundOn, isAudioUnlocked, unlockAudio, playSequence, scheduleSequence, clearScheduled, audioNow, speak, cancelSpeech, notify, requestNotificationPermission, vibrateSequence } from "./js/alerts.js";
 import { jstParts, fmtHMS, fmtClock, dayIndexJst, fmtClockRel, fmtPlanStartLabel, resolvePlanStartMs, getFixedStartInfoFromMs, dateTodToMs, fmtDur, remainSpeech, parseTime, todToMs, clampNum } from "./js/time.js";
 const $ = (id) => document.getElementById(id);
 
@@ -702,6 +702,7 @@ function announceStart() {
   R.startAnnounced = true;
   R.startPreFired = true;
   if (!R.startBeepScheduled) playSequence("item");
+  vibrateSequence("item");
   if (R.idx >= 0) {
     const it = R.items[R.idx];
     const endLabel = fmtClockRel(it.endMs, Date.now());
@@ -723,6 +724,7 @@ function announceStart() {
 
 function showNextAfterChain(now, beep) {
   if (beep) playSequence("item");
+  vibrateSequence("item");
   if (R.idx >= 0) {
     const it = R.items[R.idx];
     const endLabel = fmtClockRel(it.endMs, Date.now());
@@ -742,6 +744,7 @@ function fireStartPreAlarm(now) {
   if (now < R.startPreMs) return;
   R.startPreFired = true;
   if (!R.startPreBeepScheduled) playSequence("preStart");
+  vibrateSequence("preStart");
   const p = jstParts(R.actStartMs);
   const remain = R.actStartMs - now;
   const startLabel = fmtClockRel(R.actStartMs, now);
@@ -761,6 +764,7 @@ function fireCurrentPreAlarm(now) {
   if (now < preMs) return;
   it.preFired = true;
   if (!it.preBeepScheduled) playSequence("pre");
+  vibrateSequence("pre");
   const remain = it.endMs - now;
   const remainText = remainSpeech(remain);
   const endLabel = fmtClockRel(it.endMs, Date.now());
@@ -775,6 +779,7 @@ function fireMeetingPreAlarm(now) {
   if (now < R.actStartMs || now < R.meetPreMs || now >= R.meetEndMs) return;
   R.meetPreFired = true;
   if (!R.meetPreBeepScheduled) playSequence("pre");
+  vibrateSequence("pre");
   const remain = R.meetEndMs - now;
   const remainText = remainSpeech(remain);
   const endLabel = fmtClockRel(R.meetEndMs, now);
@@ -788,6 +793,7 @@ function enterOverrun() {
   if (R.overrun) return;
   R.overrun = true;
   if (!R.endBeepScheduled) playSequence("end");
+  vibrateSequence("end");
   showBanner("終了時刻を超過", "会議を終了するには「会議を終了」を押してください", "予定の終了時刻を過ぎました。会議を継続中です。終了する場合は会議を終了を押してください。", "endj", 15000);
   speak("予定の終了時刻を過ぎました。会議を継続中です。終了する場合は会議を終了を押してください。");
   notify("終了時刻を超過", "会議を終了するには「会議を終了」を押してください。");
@@ -806,6 +812,7 @@ function endMeeting(manual) {
   R.idx = -1;
   recordHistory();
   if (manual || !R.endBeepScheduled) playSequence("end");
+  vibrateSequence("end");
   if (manual) clearScheduled();
   showEndBanner(manual, endMs);
   speak(manual ? "会議を終了しました" : "終了");

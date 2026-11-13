@@ -17,6 +17,7 @@ async function setupPage(page, options = {}) {
   await page.addInitScript(() => {
     window.__spoken = [];
     window.__beeps = 0;
+    window.__vibrations = [];
     window.__notifications = [];
     window.__forceHidden = false;
 
@@ -76,6 +77,11 @@ async function setupPage(page, options = {}) {
       get() { return window.__forceHidden ? "hidden" : "visible"; }
     });
 
+    Object.defineProperty(navigator, "vibrate", {
+      configurable: true,
+      value: (pattern) => { window.__vibrations.push(pattern); return true; }
+    });
+
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
       value: {
@@ -116,6 +122,7 @@ test.describe("MTG timer", () => {
     await expect(page.locator("#curName")).toHaveText("テスト議題");
     await expect(page.locator("#bTitle")).toContainText("MTG開始");
     expect(await page.evaluate(() => window.__spoken.join("\n"))).toContain("MTGを開始します");
+    expect(await page.evaluate(() => window.__vibrations.length > 0)).toBe(true);
 
     await page.clock.fastForward(2200);
     await expect(page.locator("#bTitle")).toContainText("まもなく終了");
