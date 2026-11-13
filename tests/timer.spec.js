@@ -560,6 +560,7 @@ test.describe("MTG timer", () => {
     await page.fill("#meetingTitle", "定例会");
     await page.click("#startNowBtn");
     await expect(page.locator("#run")).toBeVisible();
+    await expect(page.locator("#meetingName")).toHaveText("定例会");
     await page.click("#finishBtn");
     await expect(page.locator("#curName")).toHaveText("終了");
     await page.click("#quitBtn");
@@ -585,6 +586,14 @@ test.describe("MTG timer", () => {
     const data = JSON.parse(fs.readFileSync(path, "utf8"));
     expect(data.history[0].title).toBe("定例会");
     expect(data.history[0].items[0].name).toContain("挨拶");
+
+    const csvDownloadPromise = page.waitForEvent("download");
+    await page.click("#exportHistoryCsvBtn");
+    const csvDownload = await csvDownloadPromise;
+    const csv = fs.readFileSync(await csvDownload.path(), "utf8");
+    expect(csv).toContain("会議名,開始,終了");
+    expect(csv).toContain("定例会");
+    expect(csv).toContain("挨拶・議題確認");
 
     await page.locator("#historyList button").filter({ hasText: "削除" }).click();
     await expect(page.locator("#historyCard")).toBeHidden();

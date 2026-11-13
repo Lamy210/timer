@@ -62,6 +62,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--ac)}
 #meetLeft.over{color:var(--red)}
 #run header .sp{margin-left:auto}
 .mainbox{text-align:center;padding:26px 10px 22px}
+.meetingName{font-size:14px;color:var(--sub);margin-bottom:8px;overflow-wrap:anywhere}
 .label{font-size:12px;color:var(--sub);letter-spacing:.35em;margin-bottom:6px}
 #curName{font-size:30px;margin:0 0 8px;overflow-wrap:anywhere}
 #curName:focus{outline:none}

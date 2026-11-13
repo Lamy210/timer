@@ -71,7 +71,8 @@
   <div class="card" id="historyCard" hidden>
     <div class="historyHead">
       <h2>会議履歴</h2>
-      <button type="button" id="exportHistoryBtn">履歴を書き出し</button>
+      <button type="button" id="exportHistoryBtn">JSON書き出し</button>
+      <button type="button" id="exportHistoryCsvBtn">CSV書き出し</button>
       <button type="button" id="clearHistoryBtn">すべて削除</button>
     </div>
     <div id="historyList"></div>
@@ -89,6 +90,7 @@
     <button type="button" id="quitBtn" class="big">設定に戻る</button>
   </header>
   <div class="card mainbox">
+    <div class="meetingName" id="meetingName" hidden></div>
     <div class="label" id="curLabel">いまの議題</div>
     <h2 id="curName" tabindex="-1">—</h2>
     <div class="clock" id="curLeft">--:--</div>

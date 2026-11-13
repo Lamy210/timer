@@ -993,6 +993,9 @@ function copyText(text) {
 
 function renderRun(now) {
   updateSoundButton();
+  const runTitle = R.title || "";
+  $("meetingName").textContent = runTitle;
+  $("meetingName").hidden = !runTitle;
   $("jstRunClock").textContent = fmtHMS(now);
   $("meetEndLabel").textContent = R.ended ? "終了時刻" : "会議終了";
   $("meetEnd").textContent = fmtClockRel(R.ended && R.actualEndMs ? R.actualEndMs : R.meetEndMs, now);
@@ -1495,6 +1498,44 @@ $("clearHistoryBtn").addEventListener("click", () => {
   renderHistory();
   $("startNowBtn").focus();
   toast("会議履歴を削除しました。");
+});
+
+function csvCell(value) {
+  const text = String(value == null ? "" : value);
+  return /[",\n\r]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text;
+}
+
+$("exportHistoryCsvBtn").addEventListener("click", () => {
+  const history = loadHistory();
+  if (history.length === 0) return;
+  const now = Date.now();
+  const rows = [["会議名", "開始", "終了", "予定開始", "予定終了", "実際の長さ(分)", "議題数", "スキップ数", "議題一覧"]];
+  history.forEach((entry) => {
+    const names = entry.items.map((it) => it.name).join(" / ");
+    const skipped = entry.items.filter((it) => it.status === "skip").length;
+    rows.push([
+      entry.title || "",
+      fmtPlanStartLabel(entry.actStartMs, now),
+      fmtClockRel(entry.actualEndMs, now),
+      fmtPlanStartLabel(entry.planStartMs, now),
+      fmtClockRel(entry.meetEndMs, now),
+      (Math.max(0, entry.actualEndMs - entry.actStartMs) / 60000).toFixed(1),
+      entry.items.length,
+      skipped,
+      names
+    ]);
+  });
+  const csv = "\uFEFF" + rows.map((row) => row.map(csvCell).join(",")).join("\r\n");
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "mtg-timer-history.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast("会議履歴をCSVで書き出しました。");
 });
 
 $("exportHistoryBtn").addEventListener("click", () => {
