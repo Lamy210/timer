@@ -95,6 +95,35 @@ function numInput(obj, key, min, max) {
   return inp;
 }
 
+function focusAgendaArrow(index, title) {
+  const row = document.querySelector(`#agendaBody tr:nth-child(${index + 1})`);
+  if (!row) return;
+  const btn = row.querySelector(`td.op button[title="${title}"]`);
+  if (btn && !btn.disabled) {
+    btn.focus();
+    return;
+  }
+  const other = row.querySelector('td.op button[title="上へ移動"], td.op button[title="下へ移動"]');
+  if (other && !other.disabled) {
+    other.focus();
+    return;
+  }
+  const name = row.querySelector("input.nm");
+  if (name) name.focus();
+}
+
+function focusAgendaDelete(index) {
+  const row = document.querySelector(`#agendaBody tr:nth-child(${index + 1})`);
+  if (row) {
+    const btn = row.querySelector("td.op button:last-child");
+    if (btn && !btn.disabled) {
+      btn.focus();
+      return;
+    }
+  }
+  $("addItem").focus();
+}
+
 function renderRows() {
   const body = $("agendaBody");
   body.innerHTML = "";
@@ -138,6 +167,7 @@ function renderRows() {
       rows[i - 1] = rows[i];
       rows[i] = tmp;
       renderRows();
+      focusAgendaArrow(i - 1, "上へ移動");
     });
     const down = document.createElement("button");
     down.className = "mini";
@@ -152,6 +182,7 @@ function renderRows() {
       rows[i + 1] = rows[i];
       rows[i] = tmp;
       renderRows();
+      focusAgendaArrow(i + 1, "下へ移動");
     });
     const del = document.createElement("button");
     del.className = "mini";
@@ -161,6 +192,7 @@ function renderRows() {
     del.addEventListener("click", () => {
       rows.splice(i, 1);
       renderRows();
+      focusAgendaDelete(Math.min(i, rows.length - 1));
     });
     tdO.appendChild(up);
     tdO.appendChild(down);
@@ -632,6 +664,7 @@ async function startRun(mode) {
     toast("開始予定は " + fmtPlanStartLabel(planStartMs, now) + " です。");
   }
   tick();
+  $("curName").focus();
 }
 
 function showBanner(title, sub, voiceText, kind, holdMs) {
@@ -769,6 +802,7 @@ function endMeeting(manual) {
   notify("会議終了", (manual ? "会議を終了しました" : "会議の終了時刻です") + "（日本時間 " + fmtClockRel(endMs, Date.now()) + "）");
   releaseWakeLock();
   clearRunData();
+  if (document.hasFocus()) $("curName").focus();
 }
 
 function tick() {
@@ -1135,6 +1169,8 @@ $("addItem").addEventListener("click", () => {
   }
   rows.push({ name: "", min: 5, sec: 0 });
   renderRows();
+  const name = document.querySelector(`#agendaBody tr:nth-child(${rows.length}) input.nm`);
+  if (name) name.focus();
 });
 
 $("applyTemplateBtn").addEventListener("click", () => {
@@ -1462,6 +1498,7 @@ $("quitBtn").addEventListener("click", () => {
   document.title = "MTGタイマー｜日本時間";
   saveSetup();
   updateCalc();
+  $("startNowBtn").focus();
 });
 
 document.addEventListener("visibilitychange", () => {

@@ -673,6 +673,27 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("focus moves for agenda controls and screen transitions", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.locator("#agendaBody tr:nth-child(1) td:nth-child(5) button[title=\"下へ移動\"]").click();
+    await expect.poll(() => page.evaluate(() => document.activeElement && document.activeElement.title)).toBe("下へ移動");
+
+    await page.click("#addItem");
+    await expect.poll(() => page.evaluate(() => document.activeElement && document.activeElement.className)).toBe("nm");
+
+    await page.fill("#totalMin", "60");
+    await page.click("#startNowBtn");
+    await expect(page.locator("#run")).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.activeElement && document.activeElement.id)).toBe("curName");
+
+    await page.click("#finishBtn");
+    await expect(page.locator("#curName")).toHaveText("終了");
+    await page.click("#quitBtn");
+    await expect(page.locator("#setup")).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.activeElement && document.activeElement.id)).toBe("startNowBtn");
+    expect(errors).toEqual([]);
+  });
+
   test("only one tab can run a timer at a time", async ({ context }) => {
     const page1 = await context.newPage();
     const page2 = await context.newPage();

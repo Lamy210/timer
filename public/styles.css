@@ -62,6 +62,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--ac)}
 .mainbox{text-align:center;padding:26px 10px 22px}
 .label{font-size:12px;color:var(--sub);letter-spacing:.35em;margin-bottom:6px}
 #curName{font-size:30px;margin:0 0 8px;overflow-wrap:anywhere}
+#curName:focus{outline:none}
 .clock{font-size:88px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:3px;line-height:1.05}
 .clock.small{font-size:40px;color:var(--sub)}
 .clock.fin{color:var(--ok)}
