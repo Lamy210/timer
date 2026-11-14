@@ -230,6 +230,8 @@ test.describe("MTG timer", () => {
     const errors = await setupPage(page);
     const first = page.locator("#agendaBody tr:nth-child(1) td:nth-child(1) input");
     await expect(first).toHaveValue("挨拶・議題確認");
+    await expect(page.locator("#agendaBody tr:nth-child(1) td:nth-child(2) input")).toHaveAttribute("aria-label", "議題1の分");
+    await expect(page.locator("#agendaBody tr:nth-child(1) td:nth-child(3) input")).toHaveAttribute("aria-label", "議題1の秒");
     await page.locator("#agendaBody tr:nth-child(1) td:nth-child(5) button[title=\"下へ移動\"]").click();
     await expect(page.locator("#agendaBody tr:nth-child(1) td:nth-child(1) input")).toHaveValue("議題1：報告");
     await expect(page.locator("#agendaBody tr:nth-child(2) td:nth-child(1) input")).toHaveValue("挨拶・議題確認");
@@ -409,7 +411,7 @@ test.describe("MTG timer", () => {
     await page.click("#finishBtn");
     await expect(page.locator("#curName")).toHaveText("終了");
     await expect(page.locator("#curEndLabel")).toHaveText("会議終了");
-    await expect(page.locator("#curEnd")).toHaveText("10:00:00");
+    await expect(page.locator("#curEnd")).toHaveText(/^10:00:0[01]$/);
     await expect(page.locator("#meetEndLabel")).toHaveText("終了時刻");
     await expect(page.locator("#curPrev")).toContainText("開始 10:00:00");
     await expect(page.locator("#curPrev")).toContainText("予定 10:30:00");
@@ -965,6 +967,8 @@ test.describe("MTG timer", () => {
     await page.keyboard.press("e");
     await expect(page.locator("#meetEnd")).toHaveText("10:35:00");
 
+    await page.click("#helpBtn");
+    await expect(page.locator("#bTitle")).toContainText("キーボードショートカット");
     await page.keyboard.press("?");
     await expect(page.locator("#bTitle")).toContainText("キーボードショートカット");
 

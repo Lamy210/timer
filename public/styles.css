@@ -1,5 +1,6 @@
 :root{--bg:#0f1115;--card:#171a21;--line:#2a2f3a;--tx:#e8ecf3;--sub:#98a2b3;--ac:#22d3ee;--ac2:#0e7490;--warn:#f59e0b;--ok:#34d399;--red:#f87171}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;color-scheme:dark;font-family:"Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic",sans-serif;background:var(--bg);color:var(--tx)}
 main{max-width:980px;margin:0 auto;padding:20px 16px 90px}
 h1{font-size:20px;margin:0 0 2px}
@@ -7,6 +8,8 @@ h1 small{font-weight:500;color:var(--sub);font-size:12px;margin-left:8px}
 .lead{color:var(--sub);font-size:13px;line-height:1.7;margin:0 0 16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
 .fields{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end}
+.fieldSummary{display:flex;gap:8px 18px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--sub)}
+.fieldSummary b{color:var(--tx);font-variant-numeric:tabular-nums}
 label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--sub)}
 input{background:#0b0d12;border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:6px 8px;font-size:15px;font-family:inherit}
 input:focus{outline:1px solid var(--ac)}
@@ -33,6 +36,7 @@ td.endc,td.num{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--
 td.op{white-space:nowrap;text-align:right}
 button{font-family:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:#0b0d12;color:var(--tx);padding:6px 12px;font-size:13px}
 button:hover{border-color:var(--ac)}
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 button.mini{padding:2px 8px;font-size:12px;margin-left:4px}
 button.acc{background:var(--ac2);border-color:var(--ac2);color:#fff;font-weight:700;padding:10px 22px;font-size:15px}
 button.acc:hover{background:var(--ac)}
@@ -44,10 +48,16 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .totals b{color:var(--tx);font-variant-numeric:tabular-nums}
 #warn{color:var(--red);font-size:13px}
 .startbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
-.starthelp{margin:10px 0 0}
+.startgroup{display:flex;gap:10px;flex-wrap:wrap;align-items:center;flex:1 1 520px}
+.utilitybar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.utilitybar button{font-size:13px}
+.starthelp{margin:10px 0 0;font-size:12px;color:var(--sub)}
+.starthelp summary{cursor:pointer;color:var(--ac);font-size:12px}
+.starthelp p{margin:6px 0 0}
 .historyHead{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap}
 .historyHead h2{font-size:16px;margin:0;flex:1}
 #historySearch{width:190px}
+#historySearch:focus{outline:2px solid var(--ac);outline-offset:2px}
 .historyEmpty{font-size:13px;color:var(--sub);padding:10px 0}
 .historySummary{font-size:12px;color:var(--sub);margin:0 0 10px;overflow-wrap:anywhere}
 .historyItem{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;border-top:1px solid var(--line);padding:10px 0}
@@ -118,10 +128,11 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--ac)}
 .bVoice{font-size:13px;margin-top:8px;color:var(--sub);font-style:italic}
 #toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:#263041;border:1px solid var(--ac);color:#fff;padding:10px 18px;border-radius:8px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .25s;max-width:90vw;z-index:60}
 #toast.on{opacity:1}
+@media(prefers-reduced-motion:reduce){#toast{transition:none}}
 :fullscreen main{max-width:1400px;padding-top:36px}
 :fullscreen .clock{font-size:clamp(56px,14vw,150px)}
 :fullscreen .clock.small{font-size:clamp(32px,7vw,64px)}
 :fullscreen .clock.endjp{font-size:clamp(64px,18vw,190px)}
 :fullscreen #curName{font-size:clamp(22px,4vw,48px)}
 :fullscreen .mainbox{padding:56px 20px}
-@media(max-width:640px){.historyItem{flex-direction:column}.historyOps{width:100%}.clock{font-size:56px}.clock.endjp{font-size:64px}#curName{font-size:22px}input[type=time]{width:160px}.bTitle{font-size:24px}.startbar button{flex:1 1 100%}.tablehint{display:block}}
+@media(max-width:640px){.historyItem{flex-direction:column}.historyOps{width:100%}#historySearch{width:100%;flex:1 1 100%}.clock{font-size:56px}.clock.endjp{font-size:64px}#curName{font-size:22px}input[type=time]{width:160px}.bTitle{font-size:22px}.startbar button{flex:1 1 100%}.tablehint{display:block}#banner{top:8px;width:calc(100vw - 16px);padding:10px 14px;border-radius:10px}.bSub{font-size:13px;margin-top:4px}.bVoice{display:none}}

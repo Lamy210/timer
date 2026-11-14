@@ -5,10 +5,12 @@ import { fmtHMS, fmtClockRel, fmtPlanStartLabel, fmtDur, dayIndexJst } from "./t
 
 let lastRenderKey = "";
 let runRowRefs = [];
+let endSummaryKey = "";
 
 export function resetRunView() {
   lastRenderKey = "";
   runRowRefs = [];
+  endSummaryKey = "";
 }
 
 export function updateSoundButton() {
@@ -35,14 +37,19 @@ export function renderRun(run, now) {
   $("meetEnd").textContent = fmtClockRel(R.ended && R.actualEndMs ? R.actualEndMs : R.meetEndMs, now);
   const overrun = !!R.overrun;
   const waiting = now < R.actStartMs;
-  $("meetLeftLabel").textContent = overrun ? "超過" : "会議の残り";
-  $("meetLeft").textContent = overrun ? fmtDur(now - R.meetEndMs) : fmtDur(Math.max(0, R.meetEndMs - now));
+  $("meetLeftLabel").textContent = R.ended ? "実績" : overrun ? "超過" : "会議の残り";
+  $("meetLeft").textContent = R.ended
+    ? fmtDur((R.actualEndMs || R.meetEndMs) - R.actStartMs)
+    : overrun ? fmtDur(now - R.meetEndMs) : fmtDur(Math.max(0, R.meetEndMs - now));
   $("meetLeft").classList.toggle("over", overrun);
   $("finishBtn").hidden = R.ended || waiting;
   $("skipBtn").hidden = overrun || R.ended || R.idx < 0;
   $("backBtn").hidden = overrun || R.ended;
   $("extendBtn").hidden = R.ended;
+  $("extendMin").parentElement.hidden = R.ended;
+  $("nextLine").hidden = R.ended;
   $("copyBtn").hidden = !R.ended;
+  $("endQuitBtn").hidden = !R.ended;
 
   if (R.ended) {
     $("curLabel").textContent = "会議";
@@ -210,6 +217,7 @@ function renderEndSummary(run) {
   if (!run.ended) {
     el.hidden = true;
     el.textContent = "";
+    endSummaryKey = "";
     return;
   }
   const actualEnd = run.actualEndMs || run.meetEndMs;
@@ -218,6 +226,9 @@ function renderEndSummary(run) {
   const diffMs = actualEnd - run.meetEndMs;
   const done = run.items.filter((item) => item.status === "done").length;
   const skipped = run.items.filter((item) => item.status === "skip").length;
+  const key = [actualEnd, plannedMs, actualMs, diffMs, done, skipped, run.items.length].join("|");
+  if (key === endSummaryKey) return;
+  endSummaryKey = key;
   const diffText = diffMs === 0
     ? "予定どおり"
     : (diffMs > 0 ? "+" : "-") + fmtDur(Math.abs(diffMs));

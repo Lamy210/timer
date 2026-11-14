@@ -14,12 +14,13 @@ function rowDur(r) {
   return Math.max(0, Number(r.min) || 0) * 60 + Math.max(0, Number(r.sec) || 0);
 }
 
-function numInput(obj, key, min, max) {
+function numInput(obj, key, min, max, label) {
   const inp = document.createElement("input");
   inp.type = "number";
   inp.min = min;
   inp.max = max;
   inp.value = obj[key];
+  inp.setAttribute("aria-label", label || (key === "min" ? "分" : "秒"));
   inp.style.width = "72px";
   inp.addEventListener("input", () => {
     const v = Number(inp.value);
@@ -83,9 +84,9 @@ function renderRows() {
     tdN.appendChild(inp);
 
     const tdM = document.createElement("td");
-    tdM.appendChild(numInput(r, "min", 0, 600));
+    tdM.appendChild(numInput(r, "min", 0, 600, "議題" + (i + 1) + "の分"));
     const tdS = document.createElement("td");
-    tdS.appendChild(numInput(r, "sec", 0, 59));
+    tdS.appendChild(numInput(r, "sec", 0, 59, "議題" + (i + 1) + "の秒"));
 
     const tdE = document.createElement("td");
     tdE.className = "endc";

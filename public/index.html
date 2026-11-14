@@ -19,19 +19,21 @@
 <main>
 <section id="setup">
   <h1>MTGタイマー<small>日本時間（JST）基準</small></h1>
-  <p class="lead">すべての時刻は日本時間で入力・表示します。「今すぐ開始（再計算）」は現在の日本時刻から終了時刻も計算し直します。「今すぐ開始（終了維持）」は予定終了時刻を維持したまま今すぐ開始します。「開始時刻まで待機」は予定時刻まで待ち、開始が遅れた場合は終了済みの議題をスキップします。終了時刻を過ぎた場合は、設定により超過時間を表示しながら継続できます。</p>
+  <p class="lead">すべての時刻は日本時間で入力・表示します。開始方法を選ぶと、議題ごとの残り時間とアラームを表示します。</p>
   <div class="card">
     <div class="fields">
-      <label>MTG開始時刻（日本時間）<input type="time" id="planStart" step="1" value="10:00:00"></label>
-      <label>開催日（任意）<input type="date" id="planDate" title="空の場合は開始時刻から本日/翌日を自動判定します"></label>
+      <label>MTG開始時刻（日本時間）<input type="time" id="planStart" step="1" value="10:00:00" lang="ja-JP"></label>
+      <label>開催日（任意）<input type="date" id="planDate" title="空の場合は開始時刻から本日/翌日を自動判定します" lang="ja-JP"></label>
       <label>会議名（任意）<input type="text" id="meetingTitle" maxlength="100" placeholder="例：定例会"></label>
       <label>会議の長さ（分）<input type="number" id="totalMin" min="1" max="480" value="30"></label>
       <label>開始前アラーム（分前）<input type="number" id="preStartMin" min="0" max="60" value="5"></label>
       <label>終了前アラーム（秒前）<input type="number" id="preEndSec" min="0" max="300" step="10" value="30"></label>
-      <div class="hint">予定終了：<b id="planEndDisp">--:--:--</b></div>
+    </div>
+    <div class="fieldSummary">
+      <span>予定終了：<b id="planEndDisp">--:--:--</b></span>
+      <span class="hint" id="planDateDisp">開始予定：--</span>
     </div>
     <label class="check"><input type="checkbox" id="overrunMode" checked> 終了時刻を過ぎても継続する（超過表示）</label>
-    <div class="hint" id="planDateDisp">開始予定：--</div>
     <div class="hint" id="nowEndDisp">今すぐ開始（再計算）：終了 --</div>
     <div class="hint alarmPreview" id="alarmPreview"></div>
     <div class="jstline">現在の日本時間（JST）　<b id="jstSetupClock">--:--:--</b></div>
@@ -61,14 +63,21 @@
       <input type="file" id="importHistoryFile" accept="application/json,.json" hidden>
     </div>
     <div class="startbar">
-      <button type="button" class="acc big" id="startNowBtn">今すぐ開始（再計算）</button>
-      <button type="button" class="big" id="startFixedBtn">今すぐ開始（終了維持）</button>
-      <button type="button" class="big" id="startPlanBtn">開始時刻まで待機</button>
-      <button type="button" id="voiceTestBtn">音声テスト</button>
-      <button type="button" id="notifyBtn">通知を有効化</button>
-      <button type="button" id="installBtn" hidden>アプリをインストール</button>
+      <div class="startgroup" role="group" aria-label="開始方法">
+        <button type="button" class="acc big" id="startNowBtn" title="現在時刻から開始し、終了時刻を再計算します">今すぐ開始（再計算）</button>
+        <button type="button" class="big" id="startFixedBtn" title="予定終了時刻を維持して今すぐ開始します">今すぐ開始（終了維持）</button>
+        <button type="button" class="big" id="startPlanBtn" title="予定開始時刻まで待機し、開始前アラームを鳴らします">開始時刻まで待機</button>
+      </div>
+      <div class="utilitybar">
+        <button type="button" id="voiceTestBtn">音声テスト</button>
+        <button type="button" id="notifyBtn">通知を有効化</button>
+        <button type="button" id="installBtn" hidden>アプリをインストール</button>
+      </div>
     </div>
-    <p class="hint starthelp">「今すぐ開始（再計算）」は現在時刻基準で終了時刻を再計算します。「今すぐ開始（終了維持）」は予定終了時刻を固定して今すぐ開始します（予定が2時間以上先・終了済みの場合は使えません）。「開始時刻まで待機」は予定時刻まで待機し、開始前アラームも鳴ります。超過表示がオンの場合、終了時刻後も「会議を終了」を押すまで継続します。</p>
+    <details class="starthelp">
+      <summary>開始方法の違いを見る</summary>
+      <p class="hint">「今すぐ開始（再計算）」は現在時刻基準で終了時刻を再計算します。「今すぐ開始（終了維持）」は予定終了時刻を固定して今すぐ開始します（予定が2時間以上先・終了済みの場合は使えません）。「開始時刻まで待機」は予定時刻まで待機し、開始前アラームも鳴ります。超過表示がオンの場合、終了時刻後も「会議を終了」を押すまで継続します。</p>
+    </details>
   </div>
   <div class="card" id="historyCard" hidden>
     <div class="historyHead">
@@ -89,6 +98,7 @@
     <span><span id="meetEndLabel">会議終了</span> <b id="meetEnd">--:--:--</b></span>
     <span><span id="meetLeftLabel">会議の残り</span> <b id="meetLeft">--:--</b></span>
     <span class="sp"></span>
+    <button type="button" id="helpBtn" class="mini" title="キーボードショートカット" aria-label="キーボードショートカットを表示">?</button>
     <button type="button" id="soundBtn" class="big" aria-pressed="true">音声あり</button>
     <button type="button" id="fsBtn" class="big">全画面</button>
     <button type="button" id="quitBtn" class="big">設定に戻る</button>
@@ -107,15 +117,18 @@
       <button type="button" id="extendBtn" class="big" title="現在の議題と以降の予定、会議終了を指定分延長します">延長</button>
       <button type="button" id="finishBtn" class="big danger" hidden title="会議を終了します">会議を終了</button>
       <button type="button" id="copyBtn" class="big" hidden title="会議結果をコピー">結果をコピー</button>
+      <button type="button" id="endQuitBtn" class="big" hidden title="設定画面に戻ります">設定に戻る</button>
     </div>
-    <div class="next">つぎ：<b id="nextName">—</b>　終了 <b id="nextEnd">--:--:--</b></div>
+    <div class="next" id="nextLine">つぎ：<b id="nextName">—</b>　終了 <b id="nextEnd">--:--:--</b></div>
     <div class="endSummary" id="endSummary" hidden></div>
   </div>
   <div class="timeline" id="timeline"></div>
-  <table>
-    <thead><tr><th>議題</th><th>終了時刻</th><th>残り</th><th>状態</th></tr></thead>
-    <tbody id="runBody"></tbody>
-  </table>
+  <div class="tablewrap">
+    <table>
+      <thead><tr><th>議題</th><th>終了時刻</th><th>残り</th><th>状態</th></tr></thead>
+      <tbody id="runBody"></tbody>
+    </table>
+  </div>
 </section>
 </main>
 <div id="banner" role="alert" aria-live="assertive" aria-atomic="true" hidden>

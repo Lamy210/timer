@@ -234,7 +234,11 @@ function showBanner(title, sub, voiceText, kind, holdMs) {
 }
 
 function showEndBanner(manual, endMs) {
-  showBanner("終 了", (manual ? "会議を終了しました" : "会議の終了時刻です") + "（日本時間 " + fmtClockRel(endMs, Date.now()) + "）", "終了", "endj", 30000);
+  showBanner("終 了", (manual ? "会議を終了しました" : "会議の終了時刻です") + "（日本時間 " + fmtClockRel(endMs, Date.now()) + "）", "終了", "endj", 12000);
+}
+
+function showShortcuts() {
+  showBanner("キーボードショートカット", "N: 次の議題　B: 前の議題　E: 延長　F: 会議を終了　M: 音声切替　Q: 設定に戻る", "", "start", 8000);
 }
 
 function hideBanner() {
@@ -441,6 +445,8 @@ function handleNotificationAction(action) {
 
 
 export function initRun() {
+  $("helpBtn").addEventListener("click", showShortcuts);
+
   $("voiceTestBtn").addEventListener("click", () => {
     enableAudio();
     playSequence("preStart");
@@ -572,6 +578,8 @@ export function initRun() {
     });
   }
 
+  $("endQuitBtn").addEventListener("click", () => $("quitBtn").click());
+
   $("quitBtn").addEventListener("click", () => {
     if (R && !R.ended && !window.confirm("タイマーを終了して設定に戻りますか？")) return;
     releaseRunLock();
@@ -628,7 +636,7 @@ export function initRun() {
       $("quitBtn").click();
     } else if (event.key === "?") {
       event.preventDefault();
-      showBanner("キーボードショートカット", "N: 次の議題　B: 前の議題　E: 延長　F: 会議を終了　M: 音声切替　Q: 設定に戻る", "", "start", 8000);
+      showShortcuts();
     }
   });
 
