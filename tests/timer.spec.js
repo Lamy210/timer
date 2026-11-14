@@ -809,6 +809,25 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("setup can be shared by link", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#meetingTitle", "リンク会議");
+    await page.fill("#meetingMemo", "リンクメモ");
+    await page.fill("#totalMin", "15");
+    await page.click("#shareSetupBtn");
+    await page.waitForTimeout(50);
+    const url = await page.evaluate(() => window.__copiedText || "");
+    expect(url).toContain("#setup=");
+
+    await page.goto(url, { waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(100);
+    await expect(page.locator("#meetingTitle")).toHaveValue("リンク会議");
+    await expect(page.locator("#meetingMemo")).toHaveValue("リンクメモ");
+    await expect(page.locator("#totalMin")).toHaveValue("15");
+    await expect(page.locator("#toast")).toContainText("共有された設定を読み込みました");
+    expect(errors).toEqual([]);
+  });
+
   test("exports an ICS calendar file", async ({ page }) => {
     const errors = await setupPage(page);
     await page.fill("#meetingTitle", "ICS会議");

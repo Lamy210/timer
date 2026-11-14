@@ -1,5 +1,5 @@
 import { TEMPLATES, loadSetupData, saveSetupData, serializeSetup, parseImportedSetup } from "./storage.js";
-import { $, toast } from "./ui.js";
+import { $, toast, copyText } from "./ui.js";
 import { clampNum, parseTime, todToMs, dateTodToMs, resolvePlanStartMs, getFixedStartInfoFromMs, fmtClockRel, fmtDur, fmtPlanStartLabel, fmtHMS } from "./time.js";
 import { buildIcsEvent } from "./ics.js";
 
@@ -253,8 +253,39 @@ function applySetupData(data) {
   return true;
 }
 
+function encodeBase64Url(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function decodeBase64Url(value) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized + "=".repeat((4 - normalized.length % 4) % 4);
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
 function loadSetup() {
   return applySetupData(loadSetupData());
+}
+
+function applySetupFromHash() {
+  const match = /^#setup=(.+)$/.exec(location.hash);
+  if (!match) return false;
+  try {
+    const data = parseImportedSetup(decodeBase64Url(match[1]));
+    if (!data) return false;
+    applySetupData(data);
+    try {
+      history.replaceState(null, "", location.pathname + location.search);
+    } catch (e) {}
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 export function applyHistoryTemplate(entry) {
@@ -311,8 +342,11 @@ export function initSetup(options = {}) {
   const start = (mode) => {
     if (onStart) onStart(mode);
   };
-  loadSetup();
+  const shared = applySetupFromHash();
+  if (!shared) loadSetup();
   renderRows();
+  if (shared) toast("共有された設定を読み込みました。");
+
   $("addItem").addEventListener("click", () => {
     if (rows.length >= 100) {
       toast("議題は100件までです。");
@@ -351,6 +385,16 @@ export function initSetup(options = {}) {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast("設定をJSONで書き出しました。");
+  });
+
+  $("shareSetupBtn").addEventListener("click", async () => {
+    try {
+      const url = location.origin + location.pathname + "#setup=" + encodeBase64Url(serializeSetup(collectSetupData()));
+      await copyText(url);
+      toast("設定リンクをコピーしました。");
+    } catch (e) {
+      toast("設定リンクを作成できませんでした。");
+    }
   });
 
   $("exportIcsBtn").addEventListener("click", () => {
