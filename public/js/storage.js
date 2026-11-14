@@ -64,6 +64,9 @@ export function normalizeSetupData(saved) {
   if (typeof saved.meetingTitle === "string") {
     data.meetingTitle = saved.meetingTitle.slice(0, 100);
   }
+  if (typeof saved.meetingMemo === "string") {
+    data.meetingMemo = saved.meetingMemo.slice(0, 1000);
+  }
   const rows = normalizeRows(saved.rows);
   if (rows && rows.length) data.rows = rows;
   return Object.keys(data).length ? data : null;
@@ -123,6 +126,7 @@ function normalizeHistoryEntry(entry) {
   return {
     id: entry.id,
     title: typeof entry.title === "string" ? entry.title.slice(0, 100) : "",
+    memo: typeof entry.memo === "string" ? entry.memo.slice(0, 1000) : "",
     planStartMs: entry.planStartMs,
     actStartMs: entry.actStartMs,
     meetEndMs: entry.meetEndMs,

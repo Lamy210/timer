@@ -74,6 +74,7 @@ export function resetBeepFlags(run) {
 export function createRun(options) {
   const {
     title,
+    memo,
     extendMin,
     planStartMs,
     actStartMs,
@@ -102,6 +103,7 @@ export function createRun(options) {
 
   const run = {
     title,
+    memo: memo || "",
     extendMin,
     planStartMs,
     actStartMs,
@@ -133,6 +135,7 @@ export function hydrateRun(saved, now, overrunMode) {
   const run = saved;
   run.ended = false;
   run.title = typeof run.title === "string" ? run.title.slice(0, 100) : "";
+  run.memo = typeof run.memo === "string" ? run.memo.slice(0, 1000) : "";
   run.extendMin = Number.isFinite(run.extendMin) ? clampNum(run.extendMin, 1, 60) : 5;
   run.overrunMode = overrunMode;
   run.overrun = !!run.overrun && now >= run.meetEndMs;

@@ -8,11 +8,13 @@ h1 small{font-weight:500;color:var(--sub);font-size:12px;margin-left:8px}
 .lead{color:var(--sub);font-size:13px;line-height:1.7;margin:0 0 16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
 .fields{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end}
+.memoField{margin-top:10px}
 .fieldSummary{display:flex;gap:8px 18px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--sub)}
 .fieldSummary b{color:var(--tx);font-variant-numeric:tabular-nums}
 label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--sub)}
-input{background:#0b0d12;border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:6px 8px;font-size:15px;font-family:inherit}
-input:focus{outline:1px solid var(--ac)}
+input, textarea{background:#0b0d12;border:1px solid var(--line);color:var(--tx);border-radius:6px;padding:6px 8px;font-size:15px;font-family:inherit}
+input:focus, textarea:focus{outline:1px solid var(--ac)}
+textarea{width:100%;resize:vertical;min-height:54px;line-height:1.5}
 input[type=time]{width:176px;font-variant-numeric:tabular-nums}
 input[type=date]{width:160px;font-variant-numeric:tabular-nums}
 #meetingTitle{width:200px}
@@ -36,7 +38,7 @@ td.endc,td.num{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--
 td.op{white-space:nowrap;text-align:right}
 button{font-family:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:#0b0d12;color:var(--tx);padding:6px 12px;font-size:13px}
 button:hover{border-color:var(--ac)}
-button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 button.mini{padding:2px 8px;font-size:12px;margin-left:4px}
 button.acc{background:var(--ac2);border-color:var(--ac2);color:#fff;font-weight:700;padding:10px 22px;font-size:15px}
 button.acc:hover{background:var(--ac)}
@@ -73,6 +75,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
 .historyDetail ul{margin:4px 0 0;padding-left:18px}
 .historyDetail li{margin:2px 0}
 .historyDetail b{color:var(--tx)}
+.historyMemo{margin-top:6px;white-space:pre-wrap;color:var(--tx)}
 label.check{flex-direction:row;align-items:center;gap:8px;font-size:12px;color:var(--sub);margin-top:10px}
 input[type=checkbox]{width:auto;padding:0;accent-color:var(--ac)}
 #run header{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
@@ -81,6 +84,7 @@ input[type=checkbox]{width:auto;padding:0;accent-color:var(--ac)}
 #run header .sp{margin-left:auto}
 .mainbox{text-align:center;padding:26px 10px 22px}
 .meetingName{font-size:14px;color:var(--sub);margin-bottom:8px;overflow-wrap:anywhere}
+.meetingMemo{font-size:12px;color:var(--sub);margin:0 auto 10px;max-width:680px;white-space:pre-wrap;overflow-wrap:anywhere}
 .label{font-size:12px;color:var(--sub);letter-spacing:.35em;margin-bottom:6px}
 #curName{font-size:30px;margin:0 0 8px;overflow-wrap:anywhere}
 #curName:focus{outline:none}

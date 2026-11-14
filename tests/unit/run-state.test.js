@@ -75,6 +75,7 @@ test("createRun builds pre/meet alarm state and starts the first agenda", () => 
   assert.equal(run.startPreMissed, false);
   assert.equal(run.meetPreEnabled, false);
   assert.equal(run.overrun, false);
+  assert.equal(run.memo, "");
 });
 
 test("createRun marks agendas that ended before a late start", () => {
@@ -208,6 +209,7 @@ test("hydrateRun normalizes persisted state and clears transient flags", () => {
   const run = hydrateRun(saved, NOW, false);
   assert.equal(run.ended, false);
   assert.equal(run.title.length, 100);
+  assert.equal(run.memo, "");
   assert.equal(run.extendMin, 60);
   assert.equal(run.overrunMode, false);
   assert.equal(run.overrun, false);

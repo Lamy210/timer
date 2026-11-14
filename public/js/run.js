@@ -107,6 +107,7 @@ export async function startRun(mode) {
   const preEndSec = clampNum($("preEndSec").value, 0, 300);
   const overrunMode = $("overrunMode").checked;
   const meetingTitle = $("meetingTitle").value.trim().slice(0, 100);
+  const meetingMemo = $("meetingMemo").value.trim().slice(0, 1000);
   const extendMin = clampNum($("extendMin").value, 1, 60);
   $("totalMin").value = totalMin;
   $("preStartMin").value = preStartMin;
@@ -174,6 +175,7 @@ export async function startRun(mode) {
   const meetEndMs = planStartMs + totalSec * 1000;
   const created = createRun({
     title: meetingTitle,
+    memo: meetingMemo,
     extendMin,
     planStartMs,
     actStartMs,
@@ -423,6 +425,7 @@ function recordHistory() {
   saveHistoryEntry({
     id: String(Date.now()) + "-" + Math.random().toString(36).slice(2, 8),
     title: R.title || "",
+    memo: R.memo || "",
     planStartMs: R.planStartMs,
     actStartMs: R.actStartMs,
     meetEndMs: R.meetEndMs,

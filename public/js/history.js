@@ -208,6 +208,12 @@ export function renderHistory() {
     detailSummary.textContent = "予定 " + fmtClockRel(entry.planStartMs, now) + " 〜 " + fmtClockRel(entry.meetEndMs, now)
       + "　／　実績 " + fmtClockRel(entry.actStartMs, now) + " 〜 " + fmtClockRel(entry.actualEndMs, now);
     detail.appendChild(detailSummary);
+    if (entry.memo) {
+      const memo = document.createElement("div");
+      memo.className = "historyMemo";
+      memo.textContent = entry.memo;
+      detail.appendChild(memo);
+    }
     const detailList = document.createElement("ul");
     entry.items.forEach((it) => {
       const li = document.createElement("li");

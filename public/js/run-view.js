@@ -32,6 +32,8 @@ export function renderRun(run, now) {
   const runTitle = R.title || "";
   $("meetingName").textContent = runTitle;
   $("meetingName").hidden = !runTitle;
+  $("meetingMemoRun").textContent = R.memo || "";
+  $("meetingMemoRun").hidden = !R.memo;
   $("jstRunClock").textContent = fmtHMS(now);
   $("meetEndLabel").textContent = R.ended ? "終了時刻" : "会議終了";
   $("meetEnd").textContent = fmtClockRel(R.ended && R.actualEndMs ? R.actualEndMs : R.meetEndMs, now);

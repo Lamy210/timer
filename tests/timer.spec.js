@@ -668,6 +668,27 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("meeting memo is shown during the run and included in history copy", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#meetingTitle", "メモ会議");
+    await page.fill("#meetingMemo", "背景メモ\n決定事項あり");
+    await page.click("#startNowBtn");
+    await expect(page.locator("#meetingMemoRun")).toBeVisible();
+    await expect(page.locator("#meetingMemoRun")).toContainText("背景メモ");
+    await page.click("#finishBtn");
+    await expect(page.locator("#copyBtn")).toBeVisible();
+    await page.click("#copyBtn");
+    await page.waitForTimeout(50);
+    const copied = await page.evaluate(() => window.__copiedText || "");
+    expect(copied).toContain("メモ: 背景メモ");
+    expect(copied).toContain("決定事項あり");
+    await page.click("#quitBtn");
+    await expect(page.locator("#historyCard")).toBeVisible();
+    await page.locator("#historyList button").filter({ hasText: "詳細" }).click();
+    await expect(page.locator("#historyList .historyMemo")).toContainText("決定事項あり");
+    expect(errors).toEqual([]);
+  });
+
   test("template selection applies a preset", async ({ page }) => {
     const errors = await setupPage(page);
     await page.selectOption("#templateSelect", "short");

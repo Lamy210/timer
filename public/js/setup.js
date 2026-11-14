@@ -215,6 +215,7 @@ function collectSetupData() {
     planStart: $("planStart").value,
     planDate: $("planDate").value,
     meetingTitle: $("meetingTitle").value.trim().slice(0, 100),
+    meetingMemo: $("meetingMemo").value.trim().slice(0, 1000),
     totalMin: clampNum($("totalMin").value, 1, 480),
     preStartMin: clampNum($("preStartMin").value, 0, 60),
     preEndSec: clampNum($("preEndSec").value, 0, 300),
@@ -237,6 +238,7 @@ function applySetupData(data) {
   if (data.planStart) $("planStart").value = data.planStart;
   if (data.planDate !== undefined) $("planDate").value = data.planDate;
   if (data.meetingTitle !== undefined) $("meetingTitle").value = data.meetingTitle;
+  if (data.meetingMemo !== undefined) $("meetingMemo").value = data.meetingMemo;
   if (data.totalMin != null) $("totalMin").value = data.totalMin;
   if (data.preStartMin != null) $("preStartMin").value = data.preStartMin;
   if (data.preEndSec != null) $("preEndSec").value = data.preEndSec;
@@ -272,6 +274,7 @@ export function applyHistoryTemplate(entry) {
   }
   const total = Math.max(1, Math.min(480, Math.ceil((entry.meetEndMs - entry.planStartMs) / 60000)));
   $("meetingTitle").value = entry.title || "";
+  $("meetingMemo").value = entry.memo || "";
   $("totalMin").value = String(total);
   rows.length = 0;
   nextRows.forEach((row) => rows.push(row));
@@ -392,6 +395,7 @@ export function initSetup(options = {}) {
   $("planStart").addEventListener("input", () => updateCalc());
   $("planDate").addEventListener("input", () => updateCalc());
   $("overrunMode").addEventListener("change", scheduleSaveSetup);
+  $("meetingMemo").addEventListener("input", scheduleSaveSetup);
 
   $("startNowBtn").addEventListener("click", () => start("now"));
   $("startFixedBtn").addEventListener("click", () => start("fixed"));

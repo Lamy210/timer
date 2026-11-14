@@ -13,6 +13,7 @@ export function buildSummary(run) {
   const lines = [
     "MTGタイマー結果",
     ...(run.title ? ["会議名: " + run.title] : []),
+    ...(run.memo ? ["メモ: " + run.memo] : []),
     "開始: " + fmtClockRel(run.actStartMs, now),
     "終了: " + fmtClockRel(actualEnd, now) + "（予定 " + fmtClockRel(run.meetEndMs, now) + "）",
     "予定: " + fmtClockRel(run.planStartMs, now) + " 〜 " + fmtClockRel(run.meetEndMs, now) + "（" + fmtDur(run.meetEndMs - run.planStartMs) + "）",
