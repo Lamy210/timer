@@ -11,6 +11,7 @@ const HISTORY_STATUS = {
 };
 
 let applyTemplate = null;
+let historyQuery = "";
 
 export function csvCell(value) {
   let text = String(value == null ? "" : value);
@@ -61,6 +62,11 @@ export function historyCsvRows(history, now, fmtPlanStartLabel, fmtClockRel) {
 
 export function initHistory(options = {}) {
   applyTemplate = typeof options.onApplyTemplate === "function" ? options.onApplyTemplate : null;
+
+  $("historySearch").addEventListener("input", () => {
+    historyQuery = $("historySearch").value.trim().toLowerCase();
+    renderHistory();
+  });
 
   $("importHistoryBtn").addEventListener("click", () => {
     $("importHistoryFile").click();
@@ -146,12 +152,27 @@ export function renderHistory() {
   const card = $("historyCard");
   const list = $("historyList");
   if (!card || !list) return;
-  const history = loadHistory();
+  const all = loadHistory();
+  const history = historyQuery
+    ? all.filter((entry) => {
+      const haystack = [entry.title, ...entry.items.map((it) => it.name), ...entry.items.map((it) => it.note)]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(historyQuery);
+    })
+    : all;
   const summary = $("historySummary");
-  if (summary) summary.textContent = historySummaryText(history);
-  card.hidden = history.length === 0;
+  if (summary) summary.textContent = historySummaryText(all) + (historyQuery ? "　／　表示 " + history.length + "件" : "");
+  card.hidden = all.length === 0;
   list.innerHTML = "";
   const now = Date.now();
+  if (historyQuery && history.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "historyEmpty";
+    empty.textContent = "該当する履歴がありません。";
+    list.appendChild(empty);
+    return;
+  }
   history.forEach((entry, index) => {
     const item = document.createElement("div");
     item.className = "historyItem";

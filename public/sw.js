@@ -1,4 +1,4 @@
-const CACHE = "mtg-timer-v9";
+const CACHE = "mtg-timer-v10";
 const ASSETS = [
   "./",
   "./index.html",

@@ -849,6 +849,44 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("history can be filtered by title and agenda", async ({ page }) => {
+    const errors = await setupPage(page);
+    const now = Date.now();
+    const mk = (id, title, name) => ({
+      id,
+      title,
+      planStartMs: now - 600000,
+      actStartMs: now - 600000,
+      meetEndMs: now - 300000,
+      actualEndMs: now - 300000,
+      items: [{ name, status: "done", endMs: now - 300000, note: "" }]
+    });
+    await page.setInputFiles("#importHistoryFile", {
+      name: "history-search.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify({ history: [mk("a", "Alpha会議", "議題A"), mk("b", "Beta会議", "議題B")] }))
+    });
+    await expect(page.locator("#toast")).toContainText("2件の会議履歴を読み込みました");
+    await expect(page.locator("#historyList .historyItem")).toHaveCount(2);
+
+    await page.fill("#historySearch", "Alpha");
+    await expect(page.locator("#historyList .historyItem")).toHaveCount(1);
+    await expect(page.locator("#historyList")).toContainText("Alpha会議");
+    await expect(page.locator("#historySummary")).toContainText("表示 1件");
+
+    await page.fill("#historySearch", "議題B");
+    await expect(page.locator("#historyList .historyItem")).toHaveCount(1);
+    await expect(page.locator("#historyList")).toContainText("Beta会議");
+
+    await page.fill("#historySearch", "zzz");
+    await expect(page.locator("#historyList .historyItem")).toHaveCount(0);
+    await expect(page.locator("#historyList")).toContainText("該当する履歴がありません");
+
+    await page.fill("#historySearch", "");
+    await expect(page.locator("#historyList .historyItem")).toHaveCount(2);
+    expect(errors).toEqual([]);
+  });
+
   test("start works when Web Locks throws", async ({ page }) => {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, "locks", {
