@@ -41,7 +41,7 @@ export function historySummaryText(history) {
 }
 
 export function historyCsvRows(history, now, fmtPlanStartLabel, fmtClockRel) {
-  const rows = [["会議名", "開始", "終了", "予定開始", "予定終了", "実際の長さ(分)", "議題数", "スキップ数", "議題一覧"]];
+  const rows = [["会議名", "開始", "終了", "予定開始", "予定終了", "実際の長さ(分)", "議題数", "スキップ数", "議題一覧", "メモ"]];
   history.forEach((entry) => {
     const names = entry.items.map((it) => it.name).join(" / ");
     const skipped = entry.items.filter((it) => it.status === "skip").length;
@@ -54,7 +54,8 @@ export function historyCsvRows(history, now, fmtPlanStartLabel, fmtClockRel) {
       (Math.max(0, entry.actualEndMs - entry.actStartMs) / 60000).toFixed(1),
       entry.items.length,
       skipped,
-      names
+      names,
+      entry.memo || ""
     ]);
   });
   return rows;

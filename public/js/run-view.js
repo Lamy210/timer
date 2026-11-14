@@ -56,6 +56,7 @@ export function renderRun(run, wallNow) {
   $("extendMin").parentElement.hidden = R.ended || R.paused;
   $("nextLine").hidden = R.ended;
   $("copyBtn").hidden = !R.ended;
+  $("shareBtn").hidden = !R.ended;
   $("endQuitBtn").hidden = !R.ended;
 
   if (R.ended) {

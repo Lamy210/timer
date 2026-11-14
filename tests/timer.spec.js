@@ -448,6 +448,41 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("result can be shared through the Web Share API", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "share", {
+        configurable: true,
+        value: async (data) => { window.__shared = data; }
+      });
+    });
+    await page.fill("#meetingTitle", "共有会議");
+    await page.click("#startNowBtn");
+    await page.click("#finishBtn");
+    await expect(page.locator("#shareBtn")).toBeVisible();
+    await page.click("#shareBtn");
+    const shared = await page.evaluate(() => window.__shared);
+    expect(shared.title).toContain("共有会議");
+    expect(shared.text).toContain("MTGタイマー結果");
+    await page.click("#endQuitBtn");
+    await expect(page.locator("#setup")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test("result sharing falls back to copy when Web Share is unavailable", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "share", { configurable: true, value: undefined });
+    });
+    await page.click("#startNowBtn");
+    await page.click("#finishBtn");
+    await page.click("#shareBtn");
+    await page.waitForTimeout(50);
+    expect(await page.evaluate(() => window.__copiedText || "")).toContain("MTGタイマー結果");
+    await expect(page.locator("#toast")).toContainText("共有に対応していないため");
+    expect(errors).toEqual([]);
+  });
+
   test("pause freezes the timer and resume shifts the remaining schedule", async ({ page }) => {
     const errors = await setupPage(page);
     await page.fill("#totalMin", "1");

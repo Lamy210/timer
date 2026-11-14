@@ -38,8 +38,9 @@ test("historyCsvRows builds the header and formatted rows", () => {
     actualEndMs: 600001,
     planStartMs: 0,
     meetEndMs: 600000,
-    items: [{ name: "A", status: "skip" }, { name: "B", status: "done" }]
+    items: [{ name: "A", status: "skip" }, { name: "B", status: "done" }],
+    memo: "メモ"
   }], 0, (ms) => "P" + ms, (ms) => "C" + ms);
-  assert.deepEqual(rows[0], ["会議名", "開始", "終了", "予定開始", "予定終了", "実際の長さ(分)", "議題数", "スキップ数", "議題一覧"]);
-  assert.deepEqual(rows[1], ["=T", "P1", "C600001", "P0", "C600000", "10.0", 2, 1, "A / B"]);
+  assert.deepEqual(rows[0], ["会議名", "開始", "終了", "予定開始", "予定終了", "実際の長さ(分)", "議題数", "スキップ数", "議題一覧", "メモ"]);
+  assert.deepEqual(rows[1], ["=T", "P1", "C600001", "P0", "C600000", "10.0", 2, 1, "A / B", "メモ"]);
 });

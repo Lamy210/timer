@@ -457,6 +457,36 @@ function handleNotificationAction(action) {
   }
 }
 
+async function copyResult() {
+  if (!R || !R.ended) return;
+  try {
+    await copyText(buildSummary(R));
+    toast("会議結果をコピーしました。");
+  } catch (e) {
+    toast("コピーできませんでした。");
+  }
+}
+
+async function shareResult() {
+  if (!R || !R.ended) return;
+  const text = buildSummary(R);
+  const title = (R.title ? R.title + "｜" : "") + "MTGタイマー結果";
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text });
+      return;
+    } catch (e) {
+      if (e && e.name === "AbortError") return;
+    }
+  }
+  try {
+    await copyText(text);
+    toast("共有に対応していないため結果をコピーしました。");
+  } catch (e) {
+    toast("共有できませんでした。");
+  }
+}
+
 
 export function initRun() {
   $("helpBtn").addEventListener("click", showShortcuts);
@@ -594,15 +624,8 @@ export function initRun() {
     else playSequence("item");
   });
 
-  $("copyBtn").addEventListener("click", async () => {
-    if (!R || !R.ended) return;
-    try {
-      await copyText(buildSummary(R));
-      toast("会議結果をコピーしました。");
-    } catch (e) {
-      toast("コピーできませんでした。");
-    }
-  });
+  $("copyBtn").addEventListener("click", copyResult);
+  $("shareBtn").addEventListener("click", shareResult);
 
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.addEventListener("message", (event) => {
