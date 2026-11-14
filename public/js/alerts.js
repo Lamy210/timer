@@ -167,17 +167,26 @@ export async function requestNotificationPermission() {
   }
 }
 
+function supportsNotificationActions() {
+  return typeof Notification !== "undefined"
+    && Number.isFinite(Notification.maxActions)
+    && Notification.maxActions > 0;
+}
+
 export async function notify(title, body, extra = {}) {
   try {
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     if (document.visibilityState === "visible") return;
     const options = {
       body: body,
-      tag: "mtg-timer",
-      renotify: true,
-      icon: "./icons/icon-192.png",
-      ...extra
+      tag: extra.tag || "mtg-timer",
+      icon: "./icons/icon-192.png"
     };
+    if (supportsNotificationActions()) {
+      options.renotify = true;
+      if (Array.isArray(extra.actions) && extra.actions.length > 0) options.actions = extra.actions;
+      if (extra.requireInteraction) options.requireInteraction = true;
+    }
     if ("serviceWorker" in navigator) {
       const reg = await navigator.serviceWorker.getRegistration();
       if (reg && reg.active) {

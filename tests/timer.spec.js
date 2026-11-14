@@ -66,6 +66,7 @@ async function setupPage(page, options = {}) {
       constructor(title, options) { window.__notifications.push({ title, options }); }
     }
     FakeNotification.permission = "default";
+    FakeNotification.maxActions = 2;
     FakeNotification.requestPermission = async function () {
       FakeNotification.permission = "granted";
       return "granted";
@@ -1071,6 +1072,28 @@ test.describe("MTG timer", () => {
       }));
     });
     await expect(page.locator("#curName")).toHaveText("終了");
+    expect(errors).toEqual([]);
+  });
+
+  test("notification falls back without actions when unsupported", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.click("#notifyBtn");
+    await page.waitForTimeout(50);
+    await page.evaluate(() => { Notification.maxActions = 0; });
+    await page.fill("#totalMin", "1");
+    await makeSingleAgenda(page, "通知議題", 0, 10);
+    await page.evaluate(() => { window.__forceHidden = true; });
+    await page.click("#startNowBtn");
+    await expect(page.locator("#run")).toBeVisible();
+    await page.clock.fastForward(61000);
+    await expect(page.locator("#curName")).toHaveText("超過中");
+
+    const notifications = await page.evaluate(() => window.__notifications);
+    const overrun = notifications.find((n) => n.title === "終了時刻を超過");
+    expect(overrun).toBeTruthy();
+    expect(overrun.options.actions).toBeUndefined();
+    expect(overrun.options.requireInteraction).toBeUndefined();
+    expect(overrun.options.tag).toBe("mtg-timer-overrun");
     expect(errors).toEqual([]);
   });
 
