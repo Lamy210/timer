@@ -5,7 +5,7 @@ import { $, toast, copyText } from "./ui.js";
 import { buildSummary } from "./result.js";
 import { renderHistory } from "./history.js";
 import { getRows, saveSetup, updateCalc } from "./setup.js";
-import { buildItems, createRun, hydrateRun, autoComplete, resetBeepFlags, extendRun, skipCurrent, goBack } from "./run-state.js";
+import { buildItems, createRun, hydrateRun, autoComplete, resetBeepFlags, extendRun, skipCurrent, goBack, pauseRun, resumeRun } from "./run-state.js";
 import { renderRun, resetRunView, updateSoundButton } from "./run-view.js";
 import { requestWakeLock, releaseWakeLock, scheduleAlarms } from "./run-alarms.js";
 
@@ -54,9 +54,10 @@ export async function restoreRun() {
     if (!saved) return false;
     const now = Date.now();
     const overrunMode = saved && saved.overrunMode !== false;
+    const checkNow = saved && saved.paused && Number.isFinite(saved.pausedAt) ? saved.pausedAt : now;
     const tooLate = overrunMode
-      ? (!saved || now >= saved.meetEndMs + 2 * 60 * 60 * 1000)
-      : (!saved || now >= saved.meetEndMs);
+      ? (!saved || checkNow >= saved.meetEndMs + 2 * 60 * 60 * 1000)
+      : (!saved || checkNow >= saved.meetEndMs);
     if (!saved || saved.ended || !Array.isArray(saved.items) || !saved.items.length
       || !Number.isFinite(saved.planStartMs) || !Number.isFinite(saved.actStartMs)
       || !Number.isFinite(saved.meetEndMs) || tooLate) {
@@ -240,7 +241,7 @@ function showEndBanner(manual, endMs) {
 }
 
 function showShortcuts() {
-  showBanner("キーボードショートカット", "N: 次の議題　B: 前の議題　E: 延長　F: 会議を終了　M: 音声切替　Q: 設定に戻る", "", "start", 8000);
+  showBanner("キーボードショートカット", "N: 次の議題　B: 前の議題　P: 一時停止/再開　E: 延長　F: 会議を終了　M: 音声切替　Q: 設定に戻る", "", "start", 8000);
 }
 
 function hideBanner() {
@@ -360,6 +361,8 @@ function endMeeting(manual) {
   const endMs = manual ? Date.now() : R.meetEndMs;
   R.ended = true;
   R.overrun = false;
+  R.paused = false;
+  R.pausedAt = null;
   R.actualEndMs = endMs;
   releaseRunLock();
   R.items.forEach((it) => {
@@ -386,6 +389,11 @@ function tick() {
   }
   if (!R) return;
   const now = Date.now();
+  if (R.paused) {
+    renderRun(R, now);
+    tickTimer = setTimeout(tick, 1000);
+    return;
+  }
   if (R.overrun && now < R.meetEndMs) {
     R.overrun = false;
     persistRun();
@@ -437,18 +445,41 @@ function recordHistory() {
 
 function handleNotificationAction(action) {
   if (!R || R.ended) return;
+  if (action === "finish") {
+    endMeeting(true);
+    renderRun(R, Date.now());
+    return;
+  }
+  if (R.paused) return;
   if (action === "extend5") {
     $("extendMin").value = "5";
     $("extendBtn").click();
-  } else if (action === "finish") {
-    endMeeting(true);
-    renderRun(R, Date.now());
   }
 }
 
 
 export function initRun() {
   $("helpBtn").addEventListener("click", showShortcuts);
+
+  $("pauseBtn").addEventListener("click", () => {
+    if (!R || R.ended || R.overrun || R.idx < 0) return;
+    const now = Date.now();
+    if (R.paused) {
+      if (!resumeRun(R, now)) return;
+      persistRun();
+      scheduleAlarms(R);
+      tick();
+      showBanner("再開しました", "残り時間から再開します", "再開しました。", "start", 5000);
+      speak("再開しました。");
+    } else {
+      if (!pauseRun(R, now)) return;
+      clearScheduled();
+      persistRun();
+      renderRun(R, now);
+      showBanner("一時停止中", "再開を押すと残り時間から継続します", "一時停止しました。", "pre", 5000);
+      speak("一時停止しました。");
+    }
+  });
 
   $("voiceTestBtn").addEventListener("click", () => {
     enableAudio();
@@ -625,6 +656,9 @@ export function initRun() {
     } else if (key === "b") {
       event.preventDefault();
       if (!$("backBtn").hidden) $("backBtn").click();
+    } else if (key === "p") {
+      event.preventDefault();
+      if (!$("pauseBtn").hidden) $("pauseBtn").click();
     } else if (key === "e") {
       event.preventDefault();
       if (!$("extendBtn").hidden) $("extendBtn").click();

@@ -26,7 +26,10 @@ export function scheduleAlarms(run) {
     clearScheduled();
     return;
   }
-  if (run.overrun) return;
+  if (run.overrun || run.paused) {
+    clearScheduled();
+    return;
+  }
   if (!isAudioUnlocked()) {
     clearScheduled();
     return;

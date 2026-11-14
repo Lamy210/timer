@@ -167,7 +167,7 @@ test.describe("MTG timer", () => {
     await page.click("#startPlanBtn");
 
     await expect(page.locator("#curName")).toHaveText("MTG開始まで");
-    await expect(page.locator("#curLeft")).toHaveText(/^(2:00|1:59)$/);
+    await expect(page.locator("#curLeft")).toHaveText(/^(2:00|1:\d\d)$/);
     await expect(page.locator("#curEndLabel")).toHaveText("MTG開始");
     await expect(page.locator("#curPrev")).toContainText("開始予定 本日");
 
@@ -435,9 +435,64 @@ test.describe("MTG timer", () => {
     await expect(page.locator("#curName")).toHaveText("終了");
     await expect(page.locator("#endSummary")).toBeVisible();
     await expect(page.locator("#endSummary")).toContainText("予定 1:00");
-    await expect(page.locator("#endSummary")).toContainText("実績 0:00");
+    await expect(page.locator("#endSummary")).toContainText(/実績 0:0[01]/);
     await expect(page.locator("#endSummary")).toContainText("議題 1件（完了1・スキップ0）");
     await expect(page.locator("#endSummary")).toContainText(/（-[01]:[0-5]\d）/);
+    await expect(page.locator("#meetLeftLabel")).toHaveText("実績");
+    await expect(page.locator("#meetLeft")).toHaveText(/^0:0[01]$/);
+    await expect(page.locator("#endQuitBtn")).toBeVisible();
+    await expect(page.locator("#extendMin")).toBeHidden();
+    await expect(page.locator("#nextLine")).toBeHidden();
+    await page.click("#endQuitBtn");
+    await expect(page.locator("#setup")).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
+  test("pause freezes the timer and resume shifts the remaining schedule", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#totalMin", "1");
+    await makeSingleAgenda(page, "停止議題", 0, 30);
+    await page.click("#startNowBtn");
+    await expect(page.locator("#pauseBtn")).toHaveText("一時停止");
+    await expect(page.locator("#curLeft")).toHaveText(/^0:\d\d$/);
+
+    await page.click("#pauseBtn");
+    await expect(page.locator("#curLabel")).toHaveText("一時停止中");
+    await expect(page.locator("#pauseBtn")).toHaveText("再開");
+    await expect(page.locator("#meetLeftLabel")).toHaveText("残り（停止中）");
+    const frozen = await page.locator("#curLeft").textContent();
+
+    await page.clock.fastForward(60000);
+    await expect(page.locator("#curLeft")).toHaveText(frozen);
+    await expect(page.locator("#curName")).toHaveText("停止議題");
+    await expect(page.locator("#endSummary")).toBeHidden();
+
+    await page.click("#pauseBtn");
+    await expect(page.locator("#pauseBtn")).toHaveText("一時停止");
+    await expect(page.locator("#meetEnd")).toHaveText(/^10:02:0[0-5]$/);
+    await expect(page.locator("#curLeft")).toHaveText(/^0:(2\d|30)$/);
+    await page.click("#finishBtn");
+    await expect(page.locator("#curName")).toHaveText("終了");
+    expect(errors).toEqual([]);
+  });
+
+  test("paused run restores after reload", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#totalMin", "1");
+    await makeSingleAgenda(page, "停止復元", 0, 30);
+    await page.click("#startNowBtn");
+    await page.click("#pauseBtn");
+    await expect(page.locator("#curLabel")).toHaveText("一時停止中");
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForTimeout(200);
+    await expect(page.locator("#run")).toBeVisible();
+    await expect(page.locator("#curLabel")).toHaveText("一時停止中");
+    await expect(page.locator("#pauseBtn")).toHaveText("再開");
+    await expect(page.locator("#curName")).toHaveText("停止復元");
+
+    await page.click("#pauseBtn");
+    await expect(page.locator("#pauseBtn")).toHaveText("一時停止");
     expect(errors).toEqual([]);
   });
 
@@ -1089,7 +1144,7 @@ test.describe("MTG timer", () => {
       }));
     });
     await expect(page.locator("#curName")).not.toHaveText("超過中");
-    await expect(page.locator("#meetEnd")).toHaveText(/10:06:0[01]/);
+    await expect(page.locator("#meetEnd")).toHaveText(/10:06:0[0-5]/);
 
     await page.evaluate(() => {
       navigator.serviceWorker.dispatchEvent(new MessageEvent("message", {

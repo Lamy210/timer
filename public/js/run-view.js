@@ -26,29 +26,34 @@ export function updateSoundButton() {
   btn.setAttribute("aria-pressed", on ? "true" : "false");
 }
 
-export function renderRun(run, now) {
+export function renderRun(run, wallNow) {
   const R = run;
+  const now = R.paused && Number.isFinite(R.pausedAt) ? R.pausedAt : wallNow;
   updateSoundButton();
   const runTitle = R.title || "";
   $("meetingName").textContent = runTitle;
   $("meetingName").hidden = !runTitle;
   $("meetingMemoRun").textContent = R.memo || "";
   $("meetingMemoRun").hidden = !R.memo;
-  $("jstRunClock").textContent = fmtHMS(now);
+  $("jstRunClock").textContent = fmtHMS(wallNow);
   $("meetEndLabel").textContent = R.ended ? "終了時刻" : "会議終了";
   $("meetEnd").textContent = fmtClockRel(R.ended && R.actualEndMs ? R.actualEndMs : R.meetEndMs, now);
   const overrun = !!R.overrun;
   const waiting = now < R.actStartMs;
-  $("meetLeftLabel").textContent = R.ended ? "実績" : overrun ? "超過" : "会議の残り";
+  $("meetLeftLabel").textContent = R.ended ? "実績" : R.paused ? "残り（停止中）" : overrun ? "超過" : "会議の残り";
   $("meetLeft").textContent = R.ended
     ? fmtDur((R.actualEndMs || R.meetEndMs) - R.actStartMs)
     : overrun ? fmtDur(now - R.meetEndMs) : fmtDur(Math.max(0, R.meetEndMs - now));
   $("meetLeft").classList.toggle("over", overrun);
   $("finishBtn").hidden = R.ended || waiting;
-  $("skipBtn").hidden = overrun || R.ended || R.idx < 0;
-  $("backBtn").hidden = overrun || R.ended;
-  $("extendBtn").hidden = R.ended;
-  $("extendMin").parentElement.hidden = R.ended;
+  $("skipBtn").hidden = overrun || R.ended || R.idx < 0 || R.paused;
+  $("backBtn").hidden = overrun || R.ended || R.paused;
+  $("pauseBtn").hidden = overrun || R.ended || waiting || R.idx < 0;
+  $("pauseBtn").textContent = R.paused ? "再開" : "一時停止";
+  $("pauseBtn").title = R.paused ? "タイマーを再開します" : "タイマーを一時停止します";
+  $("pauseBtn").setAttribute("aria-pressed", R.paused ? "true" : "false");
+  $("extendBtn").hidden = R.ended || R.paused;
+  $("extendMin").parentElement.hidden = R.ended || R.paused;
   $("nextLine").hidden = R.ended;
   $("copyBtn").hidden = !R.ended;
   $("endQuitBtn").hidden = !R.ended;
@@ -130,7 +135,12 @@ export function renderRun(run, now) {
     $("nextEnd").textContent = "--:--:--";
   }
 
-  const key = (R.ended ? "E" : overrun ? "O" : waiting ? "W" : "R") + "|" + R.idx + "|" + R.meetEndMs + "|" + dayIndexJst(now) + "|"
+  if (R.paused) {
+    $("curLabel").textContent = "一時停止中";
+    $("curPrev").textContent = "再開すると残り時間から継続します";
+  }
+
+  const key = (R.ended ? "E" : R.paused ? "P" : overrun ? "O" : waiting ? "W" : "R") + "|" + R.idx + "|" + R.meetEndMs + "|" + dayIndexJst(now) + "|"
     + R.items.map((it) => it.name + ":" + it.status + ":" + it.endMs + ":" + it.note).join("|");
   if (key !== lastRenderKey) {
     lastRenderKey = key;
@@ -203,13 +213,15 @@ export function renderRun(run, now) {
 
   document.title = titlePrefix + (R.ended
     ? "終了｜MTGタイマー"
-    : overrun
-      ? "超過 +" + fmtDur(now - R.meetEndMs) + "｜MTGタイマー"
-      : waiting
-        ? "開始待ち " + $("curLeft").textContent + "｜MTGタイマー"
-        : R.idx >= 0
-          ? $("curLeft").textContent + " " + R.items[R.idx].name + "｜MTGタイマー"
-          : "残り " + $("curLeft").textContent + "｜MTGタイマー");
+    : R.paused
+      ? "一時停止｜MTGタイマー"
+      : overrun
+        ? "超過 +" + fmtDur(now - R.meetEndMs) + "｜MTGタイマー"
+        : waiting
+          ? "開始待ち " + $("curLeft").textContent + "｜MTGタイマー"
+          : R.idx >= 0
+            ? $("curLeft").textContent + " " + R.items[R.idx].name + "｜MTGタイマー"
+            : "残り " + $("curLeft").textContent + "｜MTGタイマー");
 }
 
 

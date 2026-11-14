@@ -9,7 +9,9 @@ import {
   resetBeepFlags,
   extendRun,
   skipCurrent,
-  goBack
+  goBack,
+  pauseRun,
+  resumeRun
 } from "../../public/js/run-state.js";
 
 const NOW = 1_000_000;
@@ -76,6 +78,8 @@ test("createRun builds pre/meet alarm state and starts the first agenda", () => 
   assert.equal(run.meetPreEnabled, false);
   assert.equal(run.overrun, false);
   assert.equal(run.memo, "");
+  assert.equal(run.paused, false);
+  assert.equal(run.pausedAt, null);
 });
 
 test("createRun marks agendas that ended before a late start", () => {
@@ -210,6 +214,8 @@ test("hydrateRun normalizes persisted state and clears transient flags", () => {
   assert.equal(run.ended, false);
   assert.equal(run.title.length, 100);
   assert.equal(run.memo, "");
+  assert.equal(run.paused, false);
+  assert.equal(run.pausedAt, null);
   assert.equal(run.extendMin, 60);
   assert.equal(run.overrunMode, false);
   assert.equal(run.overrun, false);
@@ -227,4 +233,50 @@ test("hydrateRun normalizes persisted state and clears transient flags", () => {
   assert.equal(run.items[0].preFired, false);
   assert.equal(run.items[0].preBeepScheduled, false);
   assert.equal(run.items[0].endBeepScheduled, false);
+});
+
+test("pauseRun freezes state and resumeRun shifts the remaining schedule", () => {
+  const run = normalRun();
+  const pauseAt = run.actStartMs + 10000;
+  const firstEnd = run.items[0].endMs;
+  const secondEnd = run.items[1].endMs;
+  const firstAnchor = run.items[0].anchorMs;
+  const meetEnd = run.meetEndMs;
+
+  assert.equal(pauseRun(run, pauseAt), true);
+  assert.equal(run.paused, true);
+  assert.equal(run.pausedAt, pauseAt);
+  assert.equal(pauseRun(run, pauseAt + 1000), false);
+
+  assert.equal(resumeRun(run, pauseAt + 60000), true);
+  assert.equal(run.paused, false);
+  assert.equal(run.pausedAt, null);
+  assert.equal(run.items[0].endMs, firstEnd + 60000);
+  assert.equal(run.items[1].endMs, secondEnd + 60000);
+  assert.equal(run.items[0].anchorMs, firstAnchor + 60000);
+  assert.equal(run.meetEndMs, meetEnd + 60000);
+});
+
+test("hydrateRun keeps a paused run paused and not overrun", () => {
+  const saved = {
+    title: "",
+    memo: "",
+    extendMin: 5,
+    overrunMode: true,
+    paused: true,
+    pausedAt: NOW,
+    overrun: true,
+    meetEndMs: NOW - 1000,
+    preEndSec: 0,
+    startPreEnabled: false,
+    meetPreEnabled: false,
+    startPreFired: true,
+    startPreMissed: false,
+    meetPreFired: true,
+    items: [{ status: "run", note: "", preFired: false }]
+  };
+  const run = hydrateRun(saved, NOW, true);
+  assert.equal(run.paused, true);
+  assert.equal(run.pausedAt, NOW);
+  assert.equal(run.overrun, false);
 });

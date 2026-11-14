@@ -111,6 +111,8 @@ export function createRun(options) {
     preEndSec,
     overrunMode,
     overrun: false,
+    paused: false,
+    pausedAt: null,
     items,
     idx: -1,
     ended: false,
@@ -138,7 +140,9 @@ export function hydrateRun(saved, now, overrunMode) {
   run.memo = typeof run.memo === "string" ? run.memo.slice(0, 1000) : "";
   run.extendMin = Number.isFinite(run.extendMin) ? clampNum(run.extendMin, 1, 60) : 5;
   run.overrunMode = overrunMode;
-  run.overrun = !!run.overrun && now >= run.meetEndMs;
+  run.paused = !!run.paused && Number.isFinite(run.pausedAt);
+  run.pausedAt = run.paused ? run.pausedAt : null;
+  run.overrun = !run.paused && !!run.overrun && now >= run.meetEndMs;
   run.preEndSec = clampNum(run.preEndSec, 0, 300);
   run.startPreEnabled = !!run.startPreEnabled;
   run.meetPreEnabled = !!run.meetPreEnabled;
@@ -215,4 +219,29 @@ export function goBack(run, now) {
   if (from) from.status = "skip";
   run.idx = index;
   return { from, to, endMs };
+}
+
+export function pauseRun(run, now) {
+  if (!run || run.ended || run.paused || run.overrun || run.idx < 0 || now < run.actStartMs) return false;
+  run.paused = true;
+  run.pausedAt = now;
+  return true;
+}
+
+export function resumeRun(run, now) {
+  if (!run || !run.paused) return false;
+  const pausedAt = Number.isFinite(run.pausedAt) ? run.pausedAt : now;
+  const delta = Math.max(0, now - pausedAt);
+  run.paused = false;
+  run.pausedAt = null;
+  if (delta > 0) {
+    run.meetEndMs += delta;
+    if (run.meetPreEnabled) run.meetPreMs += delta;
+    run.items.forEach((item) => {
+      if (item.status !== "run" && item.status !== "wait") return;
+      item.endMs += delta;
+      if (Number.isFinite(item.anchorMs)) item.anchorMs += delta;
+    });
+  }
+  return true;
 }
