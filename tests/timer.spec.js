@@ -774,6 +774,24 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("exports an ICS calendar file", async ({ page }) => {
+    const errors = await setupPage(page);
+    await page.fill("#meetingTitle", "ICS会議");
+    await page.fill("#meetingMemo", "背景メモ");
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.click("#exportIcsBtn");
+    const download = await downloadPromise;
+    const ics = fs.readFileSync(await download.path(), "utf8");
+    expect(ics).toContain("BEGIN:VCALENDAR");
+    expect(ics).toContain("DTSTART:20261112T010000Z");
+    expect(ics).toContain("DTEND:20261112T013000Z");
+    expect(ics).toContain("SUMMARY:ICS会議");
+    expect(ics).toContain("DESCRIPTION:背景メモ");
+    expect(ics).toContain("UID:mtg-timer-");
+    expect(errors).toEqual([]);
+  });
+
   test("JSON import applies a setup", async ({ page }) => {
     const errors = await setupPage(page);
     const imported = {
@@ -1212,5 +1230,6 @@ test.describe("MTG timer", () => {
     expect((await page.request.get("/js/run-state.js")).ok()).toBe(true);
     expect((await page.request.get("/js/run.js")).ok()).toBe(true);
     expect((await page.request.get("/js/run-alarms.js")).ok()).toBe(true);
+    expect((await page.request.get("/js/ics.js")).ok()).toBe(true);
   });
 });

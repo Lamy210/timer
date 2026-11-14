@@ -1,6 +1,7 @@
 import { TEMPLATES, loadSetupData, saveSetupData, serializeSetup, parseImportedSetup } from "./storage.js";
 import { $, toast } from "./ui.js";
 import { clampNum, parseTime, todToMs, dateTodToMs, resolvePlanStartMs, getFixedStartInfoFromMs, fmtClockRel, fmtDur, fmtPlanStartLabel, fmtHMS } from "./time.js";
+import { buildIcsEvent } from "./ics.js";
 
 const rows = [
   { name: "挨拶・議題確認", min: 1, sec: 0 },
@@ -350,6 +351,45 @@ export function initSetup(options = {}) {
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     toast("設定をJSONで書き出しました。");
+  });
+
+  $("exportIcsBtn").addEventListener("click", () => {
+    const data = collectSetupData();
+    const ps = parseTime(data.planStart);
+    if (ps == null) {
+      toast("MTG開始時刻を入力してください。");
+      return;
+    }
+    const now = Date.now();
+    const totalSec = data.totalMin * 60;
+    let planStartMs;
+    if (data.planDate) {
+      planStartMs = dateTodToMs(data.planDate, ps);
+      if (planStartMs == null) {
+        toast("開催日が不正です。日付を確認してください。");
+        return;
+      }
+    } else {
+      planStartMs = resolvePlanStartMs(ps, totalSec, now);
+    }
+    const ics = buildIcsEvent({
+      title: data.meetingTitle,
+      memo: data.meetingMemo,
+      agenda: data.rows,
+      startMs: planStartMs,
+      endMs: planStartMs + totalSec * 1000,
+      now
+    });
+    const blob = new Blob([ics], { type: "text/calendar;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "mtg-timer.ics";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast("カレンダー用ファイルを書き出しました。");
   });
 
   $("importBtn").addEventListener("click", () => {
