@@ -226,6 +226,21 @@ test.describe("MTG timer", () => {
     expect(errors).toEqual([]);
   });
 
+  test("mobile agenda rows keep controls visible without horizontal scrolling", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const errors = await setupPage(page);
+    const lastOp = page.locator("#agendaBody tr:nth-child(1) td:nth-child(5) button").last();
+    await expect(lastOp).toBeVisible();
+    const overflow = await page.locator("#agendaTable").evaluate((el) => {
+      const wrap = el.closest(".tablewrap");
+      return el.scrollWidth - (wrap ? wrap.clientWidth : el.clientWidth);
+    });
+    expect(overflow).toBeLessThanOrEqual(1);
+    await page.locator("#agendaBody tr:nth-child(1) td:nth-child(5) button[title=\"下へ移動\"]").click();
+    await expect(page.locator("#agendaBody tr:nth-child(1) td:nth-child(1) input")).toHaveValue("議題1：報告");
+    expect(errors).toEqual([]);
+  });
+
   test("agenda rows can be reordered", async ({ page }) => {
     const errors = await setupPage(page);
     const first = page.locator("#agendaBody tr:nth-child(1) td:nth-child(1) input");
